@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { BookOpen, Sparkles, GraduationCap, Copy, Check, RotateCcw, Search, Volume2, Globe, Loader2, HelpCircle, CheckCircle2, XCircle, Trophy, History, X, Trash2, Clock } from 'lucide-react';
 
 // PCM 데이터를 WAV 포맷으로 변환하는 유틸리티 함수
@@ -896,7 +896,6 @@ const App = () => {
                   <div className="p-6 space-y-8">
                     {quizData.questions.map((q: any, index: number) => {
                       const isCorrect = userAnswers[q.id] === q.correctAnswerIndex;
-                      const hasAnswered = userAnswers[q.id] !== undefined;
                       
                       return (
                         <div key={q.id} className="space-y-4">
