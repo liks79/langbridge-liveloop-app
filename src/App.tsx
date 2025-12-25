@@ -73,13 +73,19 @@ const App = () => {
   // 오디오 상태 관리
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speakingText, setSpeakingText] = useState<string | null>(null);
+  const [ttsSource, setTtsSource] = useState<'gemini' | 'browser' | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
   // 오디오 캐시 저장소 (Key: 텍스트, Value: Blob URL)
   const audioCache = useRef<Map<string, string>>(new Map());
 
-  // Gemini API Key (from environment variable)
+  // 현재 진행 중인 API 요청 추적 (중복 방지용)
+  const inFlightRequests = useRef<Map<string, Promise<string>>>(new Map());
+
+  // API 및 모델 설정 (from environment variables)
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+  const textModel = import.meta.env.VITE_GEMINI_TEXT_MODEL || "gemini-1.5-flash-latest";
+  const ttsModel = import.meta.env.VITE_GEMINI_TTS_MODEL || "gemini-2.0-flash-exp";
 
   // 히스토리 변경 시 localStorage 저장
   useEffect(() => {
@@ -96,111 +102,76 @@ const App = () => {
     setDetectedMode(hasKorean ? 'KtoE' : 'EtoK');
   }, [inputText]);
 
-  // 2. 결과가 나오면 주요 텍스트 오디오 미리 받기 (Pre-fetching)
-  useEffect(() => {
-    if (!result) return;
-
-    const textsToPrefetch: string[] = [];
-
-    // 키워드 단어 및 예문 수집
-    result.keywords?.forEach((k: any) => {
-      // 영문인 경우에만 프리패치 시도 (한글은 브라우저 TTS 사용)
-      if (k.word && !/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(k.word)) textsToPrefetch.push(k.word);
-      if (k.usage && !/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(k.usage)) textsToPrefetch.push(k.usage);
-    });
-
-    // 메인 문장 수집 (영어인 경우)
-    if (detectedMode === 'EtoK' && result.originalText) {
-      textsToPrefetch.push(result.originalText);
-    } else if (detectedMode === 'KtoE' && result.variations) {
-      result.variations.forEach((v: any) => textsToPrefetch.push(v.text));
-    }
-
-    // 백그라운드에서 순차적으로 패칭 (네트워크 부하 조절)
-    const fetchAll = async () => {
-      for (const text of textsToPrefetch) {
-        if (!audioCache.current.has(text)) {
-          try {
-            await getAudioUrl(text);
-          } catch (e) {
-            // 프리패치 실패는 조용히 무시 (재생 시 다시 시도됨)
-          }
-        }
-      }
-    };
-    
-    // UI 렌더링 후 실행되도록 약간 지연
-    setTimeout(fetchAll, 500);
-
-  }, [result, detectedMode]);
-
-  // 3. 분석 완료 시 자동 재생 (Auto-play) 로직
-  useEffect(() => {
-    if (!result) return;
-
-    let textToPlay = '';
-    
-    if (detectedMode === 'EtoK') {
-      textToPlay = result.originalText || inputText;
-    } else if (detectedMode === 'KtoE' && result.variations?.length > 0) {
-      textToPlay = result.variations[0].text;
-    }
-
-    if (textToPlay) {
-      const timer = setTimeout(() => {
-        speak(textToPlay);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [result]);
-
-  // 오디오 URL 가져오기 (캐시 확인 -> API 호출)
-  const getAudioUrl = async (text: string): Promise<string> => {
+  // 오디오 URL 가져오기 (Gemini TTS API 사용)
+  const getAudioUrl = async (text: string, retryCount = 0): Promise<string> => {
+    // 1. 캐시 확인
     if (audioCache.current.has(text)) {
       return audioCache.current.get(text)!;
     }
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: text }] }],
-          generationConfig: {
-            responseModalities: ["AUDIO"],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: {
-                  voiceName: "Aoede" 
+    // 2. 이미 동일한 텍스트로 요청이 진행 중인지 확인
+    if (inFlightRequests.current.has(text)) {
+      return inFlightRequests.current.get(text)!;
+    }
+
+    const fetchPromise = (async () => {
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${ttsModel}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: text }] }],
+              generationConfig: {
+                responseModalities: ["AUDIO"],
+                speechConfig: {
+                  voiceConfig: {
+                    prebuiltVoiceConfig: {
+                      voiceName: "Aoede" 
+                    }
+                  }
                 }
               }
-            }
+            }),
           }
-        }),
+        );
+
+        // 429 오류 처리: 지수 백오프(Exponential Backoff) 재시도
+        if (response.status === 429 && retryCount < 2) {
+          const waitTime = Math.pow(2, retryCount) * 1000;
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          return getAudioUrl(text, retryCount + 1);
+        }
+
+        if (!response.ok) throw new Error('Gemini TTS Error: ' + response.status);
+
+        const data = await response.json();
+        const inlineData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+
+        if (inlineData && inlineData.data) {
+          // Gemini API가 반환하는 PCM 데이터를 WAV로 변환
+          const mimeType = inlineData.mimeType || "audio/L16; rate=24000";
+          const rateMatch = mimeType.match(/rate=(\d+)/);
+          const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+
+          const wavBlob = pcmToWav(inlineData.data, sampleRate);
+          const audioUrl = URL.createObjectURL(wavBlob);
+          
+          audioCache.current.set(text, audioUrl);
+          return audioUrl;
+        } else {
+          throw new Error('No audio data received');
+        }
+      } finally {
+        // 요청이 끝나면 목록에서 제거
+        inFlightRequests.current.delete(text);
       }
-    );
+    })();
 
-    if (!response.ok) throw new Error('TTS API Error: ' + response.status);
-
-    const data = await response.json();
-    const inlineData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-
-    if (inlineData) {
-      const mimeType = inlineData.mimeType || "audio/L16; rate=24000";
-      const rateMatch = mimeType.match(/rate=(\d+)/);
-      const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
-
-      const wavBlob = pcmToWav(inlineData.data, sampleRate);
-      const audioUrl = URL.createObjectURL(wavBlob);
-      
-      audioCache.current.set(text, audioUrl);
-      return audioUrl;
-    } else {
-      // 디버깅을 위해 데이터 로그 (실제 배포시 제거 가능)
-      console.warn('TTS Response missing inlineData:', data);
-      throw new Error('No audio data received');
-    }
+    // 진행 중인 요청 목록에 등록
+    inFlightRequests.current.set(text, fetchPromise);
+    return fetchPromise;
   };
 
   // TTS 재생 함수
@@ -224,12 +195,14 @@ const App = () => {
       if (window.speechSynthesis) {
         setIsSpeaking(true);
         setSpeakingText(text);
+        setTtsSource('browser');
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'ko-KR'; // 한국어 설정
         utterance.rate = 1.0;
         utterance.onend = () => {
           setIsSpeaking(false);
           setSpeakingText(null);
+          setTtsSource(null);
         };
         window.speechSynthesis.speak(utterance);
       }
@@ -239,6 +212,7 @@ const App = () => {
     // 영어인 경우 AI TTS 시도
     setIsSpeaking(true);
     setSpeakingText(text);
+    setTtsSource('gemini');
 
     try {
       const audioUrl = await getAudioUrl(text);
@@ -249,6 +223,7 @@ const App = () => {
       audio.onended = () => {
         setIsSpeaking(false);
         setSpeakingText(null);
+        setTtsSource(null);
       };
       
       await audio.play();
@@ -256,6 +231,7 @@ const App = () => {
     } catch (err) {
       // 오류 발생 시 경고 로그만 남기고 브라우저 TTS로 폴백
       console.warn("AI TTS Failed, falling back to browser TTS", err);
+      setTtsSource('browser');
       
       if (window.speechSynthesis) {
         const utterance = new SpeechSynthesisUtterance(text);
@@ -264,23 +240,27 @@ const App = () => {
         utterance.onend = () => {
           setIsSpeaking(false);
           setSpeakingText(null);
+          setTtsSource(null);
         };
         window.speechSynthesis.speak(utterance);
       } else {
         setIsSpeaking(false);
         setSpeakingText(null);
+        setTtsSource(null);
       }
     }
   };
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = async (retryCount = 0) => {
     if (!inputText.trim()) return;
     setLoading(true);
     setError('');
-    setResult(null);
-    setQuizData(null); 
-    setUserAnswers({});
-    setShowScore(false);
+    if (retryCount === 0) {
+      setResult(null);
+      setQuizData(null); 
+      setUserAnswers({});
+      setShowScore(false);
+    }
 
     try {
       const systemPrompt = detectedMode === 'EtoK' 
@@ -326,7 +306,7 @@ const App = () => {
         `;
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -338,7 +318,14 @@ const App = () => {
         }
       );
 
-      if (!response.ok) throw new Error('AI 응답을 받아오는데 실패했습니다.');
+      // 429 오류 처리 (Too Many Requests)
+      if (response.status === 429 && retryCount < 2) {
+        const waitTime = Math.pow(2, retryCount) * 1000;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        return handleAnalyze(retryCount + 1);
+      }
+
+      if (!response.ok) throw new Error(`AI 응답 실패: ${response.status}`);
 
       const data = await response.json();
       const parsedContent = JSON.parse(data.candidates[0].content.parts[0].text);
@@ -428,7 +415,7 @@ const App = () => {
       `;
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -490,6 +477,7 @@ const App = () => {
     }
     setIsSpeaking(false);
     setSpeakingText(null);
+    setTtsSource(null);
     // 캐시 클리어는 리셋 시 하지 않고 유지하여 히스토리 복원 시 활용
     // audioCache.current.clear(); 
   };
@@ -545,6 +533,15 @@ const App = () => {
             <Volume2 size={16} />
           )}
         </button>
+        {isSpeaking && speakingText === text && (
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-1.5 animate-pulse shadow-sm border ${
+            ttsSource === 'gemini' 
+              ? 'bg-indigo-50 text-indigo-600 border-indigo-100' 
+              : 'bg-amber-50 text-amber-600 border-amber-100'
+          }`}>
+            {ttsSource === 'gemini' ? 'Gemini' : 'Browser'}
+          </span>
+        )}
       </div>
     );
   };
@@ -812,13 +809,24 @@ const App = () => {
                       <h3 className="text-xl font-bold text-indigo-700">{item.word}</h3>
                       <button 
                         onClick={() => speak(item.word)}
-                        className={`p-1 rounded-full transition-colors ${
+                        className={`p-1 rounded-full transition-colors flex items-center gap-1.5 ${
                           isSpeaking && speakingText === item.word 
                             ? 'text-indigo-600 bg-indigo-100' 
                             : 'text-indigo-200 hover:text-indigo-600 hover:bg-indigo-50'
                         }`}
                       >
-                         {isSpeaking && speakingText === item.word ? <Loader2 className="w-4 h-4 animate-spin"/> : <Volume2 className="w-4 h-4" />}
+                         {isSpeaking && speakingText === item.word ? (
+                           <>
+                             <Loader2 className="w-4 h-4 animate-spin"/>
+                             <span className={`text-[9px] font-bold uppercase tracking-tighter ${
+                               ttsSource === 'gemini' ? 'text-indigo-600' : 'text-amber-600'
+                             }`}>
+                               {ttsSource === 'gemini' ? 'Gemini' : 'Browser'}
+                             </span>
+                           </>
+                         ) : (
+                           <Volume2 className="w-4 h-4" />
+                         )}
                       </button>
                     </div>
                     <Search className="w-4 h-4 text-slate-300 group-hover:text-indigo-300 transition-colors" />
@@ -832,13 +840,24 @@ const App = () => {
                           <p className="text-sm text-slate-800 italic">"{item.usage}"</p>
                           <button 
                              onClick={() => speak(item.usage)}
-                             className={`shrink-0 mt-0.5 transition-colors ${
+                             className={`shrink-0 mt-0.5 transition-colors flex items-center gap-1 ${
                                 isSpeaking && speakingText === item.usage
                                   ? 'text-indigo-600'
                                   : 'text-slate-300 hover:text-indigo-500'
                              }`}
                           >
-                             {isSpeaking && speakingText === item.usage ? <Loader2 size={12} className="animate-spin"/> : <Volume2 size={12} />}
+                             {isSpeaking && speakingText === item.usage ? (
+                               <>
+                                 <Loader2 size={12} className="animate-spin"/>
+                                 <span className={`text-[8px] font-bold uppercase tracking-tighter ${
+                                   ttsSource === 'gemini' ? 'text-indigo-600' : 'text-amber-600'
+                                 }`}>
+                                   {ttsSource === 'gemini' ? 'Gemini' : 'Browser'}
+                                 </span>
+                               </>
+                             ) : (
+                               <Volume2 size={12} />
+                             )}
                           </button>
                         </div>
                         <p className="text-xs text-slate-500">{item.usageTranslation}</p>
@@ -975,6 +994,27 @@ const App = () => {
         )}
 
       </main>
+
+      {/* Floating TTS Status Indicator */}
+      {isSpeaking && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+          <div className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-full shadow-lg border border-indigo-100 flex items-center gap-3">
+            <div className="relative">
+              <Volume2 className="w-4 h-4 text-indigo-600" />
+              <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter leading-none">Speaking via</span>
+              <span className={`text-xs font-bold leading-tight ${ttsSource === 'gemini' ? 'text-indigo-600' : 'text-amber-600'}`}>
+                {ttsSource === 'gemini' ? '✨ Gemini AI Model' : '🌐 Browser TTS Engine'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
