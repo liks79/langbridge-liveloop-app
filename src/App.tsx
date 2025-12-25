@@ -1,47 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { BookOpen, Sparkles, GraduationCap, Copy, Check, RotateCcw, Search, Volume2, Globe, Loader2, HelpCircle, CheckCircle2, XCircle, Trophy, History, X, Trash2, Clock } from 'lucide-react';
 
-// PCM 데이터를 WAV 포맷으로 변환하는 유틸리티 함수
-const pcmToWav = (base64PCM: string, sampleRate: number = 24000) => {
-  const binaryString = atob(base64PCM);
-  const len = binaryString.length;
-  const buffer = new ArrayBuffer(len);
-  const view = new Uint8Array(buffer);
-  for (let i = 0; i < len; i++) {
-    view[i] = binaryString.charCodeAt(i);
-  }
-  
-  const pcmData = new Int16Array(buffer);
-  const wavBuffer = new ArrayBuffer(44 + pcmData.length * 2);
-  const viewWav = new DataView(wavBuffer);
-
-  const writeString = (view: DataView, offset: number, string: string) => {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
-    }
-  };
-
-  writeString(viewWav, 0, 'RIFF');
-  viewWav.setUint32(4, 36 + pcmData.length * 2, true);
-  writeString(viewWav, 8, 'WAVE');
-  writeString(viewWav, 12, 'fmt ');
-  viewWav.setUint32(16, 16, true);
-  viewWav.setUint16(20, 1, true);
-  viewWav.setUint16(22, 1, true);
-  viewWav.setUint32(24, sampleRate, true);
-  viewWav.setUint32(28, sampleRate * 2, true);
-  viewWav.setUint16(32, 2, true);
-  viewWav.setUint16(34, 16, true);
-  writeString(viewWav, 36, 'data');
-  viewWav.setUint32(40, pcmData.length * 2, true);
-
-  const pcmView = new Uint8Array(buffer);
-  const wavPayload = new Uint8Array(wavBuffer, 44);
-  wavPayload.set(pcmView);
-
-  return new Blob([wavBuffer], { type: 'audio/wav' });
-};
-
 const App = () => {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -81,11 +40,9 @@ const App = () => {
 
   // 현재 진행 중인 API 요청 추적 (중복 방지용)
   const inFlightRequests = useRef<Map<string, Promise<string>>>(new Map());
-
-  // API 및 모델 설정 (from environment variables)
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
-  const textModel = import.meta.env.VITE_GEMINI_TEXT_MODEL || "gemini-1.5-flash-latest";
-  const ttsModel = import.meta.env.VITE_GEMINI_TTS_MODEL || "gemini-2.0-flash-exp";
+  // NOTE:
+  // - Gemini API 호출은 브라우저에서 직접 하지 않고, 같은 도메인의 Worker(`/api/*`)로만 호출합니다.
+  // - API Key는 Worker의 Cloudflare Secret로만 보관되어 브라우저/레포에 노출되지 않습니다.
 
   // 히스토리 변경 시 localStorage 저장
   useEffect(() => {
@@ -102,7 +59,7 @@ const App = () => {
     setDetectedMode(hasKorean ? 'KtoE' : 'EtoK');
   }, [inputText]);
 
-  // 오디오 URL 가져오기 (Gemini TTS API 사용)
+  // 오디오 URL 가져오기 (Worker `/api/tts` 사용)
   const getAudioUrl = async (text: string, retryCount = 0): Promise<string> => {
     // 1. 캐시 확인
     if (audioCache.current.has(text)) {
@@ -116,26 +73,11 @@ const App = () => {
 
     const fetchPromise = (async () => {
       try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${ttsModel}:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: text }] }],
-              generationConfig: {
-                responseModalities: ["AUDIO"],
-                speechConfig: {
-                  voiceConfig: {
-                    prebuiltVoiceConfig: {
-                      voiceName: "Aoede" 
-                    }
-                  }
-                }
-              }
-            }),
-          }
-        );
+        const response = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
 
         // 429 오류 처리: 지수 백오프(Exponential Backoff) 재시도
         if (response.status === 429 && retryCount < 2) {
@@ -144,25 +86,12 @@ const App = () => {
           return getAudioUrl(text, retryCount + 1);
         }
 
-        if (!response.ok) throw new Error('Gemini TTS Error: ' + response.status);
+        if (!response.ok) throw new Error('TTS API Error: ' + response.status);
 
-        const data = await response.json();
-        const inlineData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-
-        if (inlineData && inlineData.data) {
-          // Gemini API가 반환하는 PCM 데이터를 WAV로 변환
-          const mimeType = inlineData.mimeType || "audio/L16; rate=24000";
-          const rateMatch = mimeType.match(/rate=(\d+)/);
-          const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
-
-          const wavBlob = pcmToWav(inlineData.data, sampleRate);
-          const audioUrl = URL.createObjectURL(wavBlob);
-          
-          audioCache.current.set(text, audioUrl);
-          return audioUrl;
-        } else {
-          throw new Error('No audio data received');
-        }
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        audioCache.current.set(text, audioUrl);
+        return audioUrl;
       } finally {
         // 요청이 끝나면 목록에서 제거
         inFlightRequests.current.delete(text);
@@ -263,60 +192,14 @@ const App = () => {
     }
 
     try {
-      const systemPrompt = detectedMode === 'EtoK' 
-        ? `
-          You are an expert English tutor for Korean students.
-          Analyze the user's English input.
-          Return a JSON object with this structure:
-          {
-            "originalText": "The original english text",
-            "translation": "Natural Korean translation",
-            "nuance": "Brief explanation of the tone or context (in Korean)",
-            "keywords": [
-              {
-                "word": "English Word",
-                "meaning": "Korean Meaning",
-                "usage": "Example sentence using this word in English",
-                "usageTranslation": "Korean translation of the example"
-              }
-            ]
-          }
-          Analyze 3-5 key words.
-        `
-        : `
-          You are an expert English writing coach for Korean speakers.
-          Analyze the user's Korean input and provide English translations.
-          Return a JSON object with this structure:
-          {
-            "originalText": "The original Korean text",
-            "variations": [
-              { "style": "Formal (격식)", "text": "English translation" },
-              { "style": "Casual (캐주얼)", "text": "English translation" },
-              { "style": "Native/Idiomatic (원어민 표현)", "text": "English translation" }
-            ],
-            "keywords": [
-              {
-                "word": "Korean Word from input",
-                "meaning": "English Equivalent",
-                "note": "Brief usage note or nuance explanation in Korean"
-              }
-            ]
-          }
-          Analyze 3-5 key words.
-        `;
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: inputText }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            generationConfig: { responseMimeType: "application/json" }
-          }),
-        }
-      );
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inputText,
+          detectedMode,
+        }),
+      });
 
       // 429 오류 처리 (Too Many Requests)
       if (response.status === 429 && retryCount < 2) {
@@ -327,8 +210,7 @@ const App = () => {
 
       if (!response.ok) throw new Error(`AI 응답 실패: ${response.status}`);
 
-      const data = await response.json();
-      const parsedContent = JSON.parse(data.candidates[0].content.parts[0].text);
+      const parsedContent = await response.json();
       setResult(parsedContent);
 
       // 히스토리 추가 (최신 100개 유지)
@@ -383,54 +265,18 @@ const App = () => {
     setError('');
 
     try {
-      const contextText = detectedMode === 'EtoK' 
-        ? `Original Text: ${result.originalText}\nTranslation: ${result.translation}\nKeywords: ${result.keywords?.map((k:any)=>k.word).join(', ')}`
-        : `Original Korean: ${result.originalText}\nEnglish Translations: ${result.variations?.map((v:any)=>v.text).join(', ')}\nKeywords: ${result.keywords?.map((k:any)=>k.meaning).join(', ')}`;
-
-      const quizPrompt = `
-        Create a mini-quiz with 3 multiple-choice questions based on the English learning material provided below.
-        
-        Context Material:
-        ${contextText}
-
-        Instructions:
-        1. Create 3 questions in Korean.
-        2. Questions should test understanding of English vocabulary meanings, usage, or grammar nuances related to the context.
-        3. Provide 4 options for each question.
-        4. Indicate the correct answer index (0-3).
-        5. Provide a brief explanation for the correct answer.
-
-        Return strictly JSON format:
-        {
-          "questions": [
-            {
-              "id": 1,
-              "question": "Question text in Korean",
-              "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-              "correctAnswerIndex": 0,
-              "explanation": "Why this is correct"
-            }
-          ]
-        }
-      `;
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: "Generate a quiz based on this context." }] }],
-            systemInstruction: { parts: [{ text: quizPrompt }] },
-            generationConfig: { responseMimeType: "application/json" }
-          }),
-        }
-      );
+      const response = await fetch('/api/quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          detectedMode,
+          result,
+        }),
+      });
 
       if (!response.ok) throw new Error('퀴즈 생성 실패');
 
-      const data = await response.json();
-      const parsedQuiz = JSON.parse(data.candidates[0].content.parts[0].text);
+      const parsedQuiz = await response.json();
       setQuizData(parsedQuiz);
 
     } catch (err) {
@@ -488,7 +334,7 @@ const App = () => {
     
     const words = text.split(/(\s+)/); 
 
-    return (
+  return (
       <div className={`flex flex-wrap items-center gap-y-1 ${className}`}>
         {words.map((segment, idx) => {
           const isWord = segment.trim().length > 0;
@@ -691,7 +537,7 @@ const App = () => {
 
           <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
             <button
-              onClick={handleAnalyze}
+              onClick={() => handleAnalyze()}
               disabled={loading || !inputText.trim()}
               className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white shadow-lg transition-all ${
                 loading || !inputText.trim()

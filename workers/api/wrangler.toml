@@ -1,0 +1,15 @@
+name = "langbridge-api"
+main = "src/index.ts"
+compatibility_date = "2025-12-25"
+
+# Routing:
+# - If you manage DNS in Cloudflare for your Pages domain, you can configure a route for `/api/*`.
+# - Otherwise, configure the Worker route in the Cloudflare dashboard (recommended for first setup).
+
+[vars]
+# Default models (override via dashboard vars if desired)
+GEMINI_TEXT_MODEL = "gemini-1.5-flash-latest"
+GEMINI_TTS_MODEL = "gemini-2.0-flash-exp"
+GEMINI_TTS_VOICE = "Aoede"
+
+

@@ -1,0 +1,8 @@
+GEMINI_API_KEY=your_key_here
+
+# Optional overrides
+GEMINI_TEXT_MODEL=gemini-1.5-flash-latest
+GEMINI_TTS_MODEL=gemini-2.0-flash-exp
+GEMINI_TTS_VOICE=Aoede
+
+
