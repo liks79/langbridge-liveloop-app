@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { BookOpen, Sparkles, GraduationCap, Copy, Check, RotateCcw, Search, Volume2, Globe, Loader2, HelpCircle, CheckCircle2, XCircle, Trophy, History, X, Trash2, Clock } from 'lucide-react';
 
 const App = () => {
@@ -18,6 +18,8 @@ const App = () => {
   const [quizLoading, setQuizLoading] = useState(false);
   const [userAnswers, setUserAnswers] = useState<{[key: number]: number}>({});
   const [showScore, setShowScore] = useState(false);
+  const [celebrationKey, setCelebrationKey] = useState(0);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   // History States (NEW)
   const [history, setHistory] = useState<any[]>(() => {
@@ -307,6 +309,114 @@ const App = () => {
       if (userAnswers[q.id] === q.correctAnswerIndex) correct++;
     });
     return correct;
+  };
+
+  const totalQuestions = quizData?.questions?.length ?? 0;
+  const isPerfectScore = useMemo(() => {
+    if (!quizData) return false;
+    if (totalQuestions <= 0) return false;
+    return calculateScore() === totalQuestions;
+  }, [quizData, totalQuestions, userAnswers]);
+
+  const playSuccessJingle = async () => {
+    try {
+      const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+
+      const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') await ctx.resume();
+
+      const master = ctx.createGain();
+      master.gain.setValueAtTime(0.0001, ctx.currentTime);
+      master.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.02);
+      master.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.75);
+      master.connect(ctx.destination);
+
+      const now = ctx.currentTime;
+      const notes = [
+        { f: 523.25, t: 0.0, d: 0.14 }, // C5
+        { f: 659.25, t: 0.14, d: 0.14 }, // E5
+        { f: 783.99, t: 0.28, d: 0.14 }, // G5
+        { f: 1046.5, t: 0.42, d: 0.22 }, // C6
+      ];
+
+      for (const n of notes) {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(n.f, now + n.t);
+        g.gain.setValueAtTime(0.0001, now + n.t);
+        g.gain.exponentialRampToValueAtTime(0.9, now + n.t + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + n.t + n.d);
+        osc.connect(g);
+        g.connect(master);
+        osc.start(now + n.t);
+        osc.stop(now + n.t + n.d + 0.02);
+      }
+
+      window.setTimeout(() => {
+        try { ctx.close(); } catch {}
+      }, 1000);
+    } catch {
+      // ignore
+    }
+  };
+
+  const triggerCelebration = async () => {
+    setCelebrationKey(Date.now());
+    setShowCelebration(true);
+    await playSuccessJingle();
+    window.setTimeout(() => setShowCelebration(false), 5200);
+  };
+
+  const handleSubmitQuiz = async () => {
+    setShowScore(true);
+    if (quizData && isPerfectScore) {
+      await triggerCelebration();
+    }
+  };
+
+  const BalloonsOverlay = ({ seed }: { seed: number }) => {
+    const balloons = useMemo(() => {
+      const colors = ['#7c3aed', '#2563eb', '#16a34a', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899'];
+      const count = 14;
+      return Array.from({ length: count }).map((_, i) => {
+        const left = ((seed + i * 47) % 100) * 1.0; // deterministic-ish
+        const size = 34 + ((seed + i * 31) % 26); // 34..59
+        const delay = (i % 6) * 0.18;
+        const float = 4.2 + (i % 5) * 0.35;
+        const sway = 1.9 + (i % 4) * 0.35;
+        const color = colors[(seed + i) % colors.length];
+        return { id: `${seed}-${i}`, left, size, delay, float, sway, color };
+      });
+    }, [seed]);
+
+    return (
+      <div className="lb-celebration-root" aria-hidden="true">
+        {balloons.map((b) => (
+          <div
+            key={b.id}
+            className="lb-balloon"
+            style={{
+              left: `${b.left}%`,
+              ['--lb-size' as any]: `${b.size}px`,
+              ['--lb-delay' as any]: `${b.delay}s`,
+              ['--lb-float' as any]: `${b.float}s`,
+              ['--lb-sway' as any]: `${b.sway}s`,
+              ['--lb-color' as any]: b.color,
+            }}
+          >
+            <div className="lb-balloon-string" />
+          </div>
+        ))}
+
+        <div className="absolute inset-x-0 top-6 flex justify-center">
+          <div className="bg-white/85 backdrop-blur-md border border-indigo-100 shadow-lg rounded-full px-4 py-2 text-sm font-bold text-indigo-700">
+            Perfect score! 🎉
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const copyToClipboard = (text: string, index: number) => {
@@ -817,7 +927,7 @@ const App = () => {
                   {!showScore && (
                     <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
                       <button
-                        onClick={() => setShowScore(true)}
+                        onClick={handleSubmitQuiz}
                         disabled={Object.keys(userAnswers).length < quizData.questions.length}
                         className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       >
@@ -866,6 +976,9 @@ const App = () => {
           </div>
         </div>
       )}
+
+      {/* Perfect-score celebration (balloons + jingle) */}
+      {showCelebration && <BalloonsOverlay key={celebrationKey} seed={celebrationKey} />}
     </div>
   );
 };

@@ -1,3 +1,77 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* LangBridge celebration overlay (perfect quiz score) */
+@keyframes lb-float-up {
+  0% {
+    transform: translate3d(0, 110vh, 0) rotate(-6deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(0, -130vh, 0) rotate(6deg);
+    opacity: 0.95;
+  }
+}
+
+@keyframes lb-sway {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(14px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.lb-celebration-root {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.lb-balloon {
+  position: absolute;
+  bottom: -20vh;
+  width: var(--lb-size, 44px);
+  height: calc(var(--lb-size, 44px) * 1.25);
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 40%),
+    var(--lb-color, #7c3aed);
+  box-shadow: 0 10px 20px rgba(2, 6, 23, 0.12);
+  filter: saturate(1.05);
+  animation:
+    lb-float-up var(--lb-float, 4.8s) linear var(--lb-delay, 0s) forwards,
+    lb-sway var(--lb-sway, 2.2s) ease-in-out var(--lb-delay, 0s) infinite;
+}
+
+.lb-balloon::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 12px;
+  height: 10px;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--lb-color, #7c3aed);
+  border-radius: 3px;
+  box-shadow: 0 6px 10px rgba(2, 6, 23, 0.08);
+}
+
+.lb-balloon-string {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 2px);
+  width: 2px;
+  height: calc(var(--lb-size, 44px) * 1.4);
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.18);
+  border-radius: 999px;
+}
