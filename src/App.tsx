@@ -2,6 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { BookOpen, Sparkles, GraduationCap, Copy, Check, RotateCcw, Search, Volume2, Globe, Loader2, HelpCircle, CheckCircle2, XCircle, Trophy, History, X, Trash2, Clock } from 'lucide-react';
 
 const App = () => {
+  // API base:
+  // - Production: keep empty -> same-origin calls to `/api/*` via Worker Route on `langbridge.liveloop.app`
+  // - Preview/dev: set `VITE_API_BASE_URL` (e.g. https://<worker>.workers.dev) to avoid domain mismatch
+  const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -73,7 +78,7 @@ const App = () => {
 
     const fetchPromise = (async () => {
       try {
-        const response = await fetch('/api/tts', {
+        const response = await fetch(`${API_BASE}/api/tts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text }),
@@ -192,7 +197,7 @@ const App = () => {
     }
 
     try {
-      const response = await fetch('/api/analyze', {
+      const response = await fetch(`${API_BASE}/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -265,7 +270,7 @@ const App = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/quiz', {
+      const response = await fetch(`${API_BASE}/api/quiz`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

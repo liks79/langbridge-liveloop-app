@@ -9,6 +9,14 @@
 - **Build command**: `npm run build`
 - **Output directory**: `dist`
 
+### Pages Preview(개발)에서 API 호출이 깨질 때
+Pages Preview URL(`*.pages.dev`)과 Worker Dev URL(`*.workers.dev`)은 도메인이 달라서, 같은 도메인(`/api/*`) 라우팅을 아직 붙이지 않은 상태에서는 API 호출이 실패할 수 있습니다.
+
+이 리포의 프론트는 기본적으로 `fetch('/api/*')`(same-origin)을 사용하지만, **Preview/개발용으로만** API Base를 바꿀 수 있도록 `VITE_API_BASE_URL`을 지원합니다.
+
+- **Production (권장)**: `VITE_API_BASE_URL` **미설정** (빈 값) → `https://langbridge.liveloop.app/api/*`
+- **Preview/Dev**: `VITE_API_BASE_URL = https://<your-worker>.workers.dev` → `https://<your-worker>.workers.dev/api/*`
+
 ## 2) Workers 설정
 - Worker 코드는 `workers/api/`에 있습니다.
 - 배포/로컬 개발은 Wrangler 사용을 권장합니다.
@@ -28,6 +36,10 @@ Wrangler 예시:
 - `https://your-pages-domain.example.com/api/analyze`
 - `https://your-pages-domain.example.com/api/quiz`
 - `https://your-pages-domain.example.com/api/tts`
+
+### LangBridge 권장 라우트
+- Pages: `https://langbridge.liveloop.app/*`
+- Worker Route: `https://langbridge.liveloop.app/api/*` → API Worker
 
 ## 4) Cloudflare Access(클로즈드 베타)
 클로즈드(팀/지인만) 운영이면 **Pages 전체를 Access로 보호**하는 구성이 가장 단순합니다.
