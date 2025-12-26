@@ -19,7 +19,11 @@ describe('apiClient', () => {
   });
 
   it('analyze() posts JSON to /api/analyze', async () => {
-    const fetchMock = vi.fn(async () => jsonResponse({ ok: true }));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      void init;
+      return jsonResponse({ ok: true });
+    });
     vi.stubGlobal('fetch', fetchMock as any);
 
     const api = createApiClient('');
@@ -27,11 +31,13 @@ describe('apiClient', () => {
     expect(res).toEqual({ ok: true });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0];
+    const [url, init] = fetchMock.mock.calls[0] as [RequestInfo | URL, RequestInit | undefined];
     expect(url).toBe('/api/analyze');
-    expect(init.method).toBe('POST');
-    expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
-    expect(init.body).toBe(JSON.stringify({ inputText: 'hello', detectedMode: 'EtoK' }));
+    expect(init).toBeDefined();
+    const requestInit = init as RequestInit;
+    expect(requestInit.method).toBe('POST');
+    expect(requestInit.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(requestInit.body).toBe(JSON.stringify({ inputText: 'hello', detectedMode: 'EtoK' }));
   });
 
   it('retries on 429 with exponential backoff (1s, 2s) then succeeds', async () => {
