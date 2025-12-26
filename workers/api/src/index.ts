@@ -12,6 +12,10 @@ type TtsRequest = {
   text: string;
 };
 
+type TopicRequest = {
+  keyword?: string;
+};
+
 type Env = {
   GEMINI_API_KEY: string;
   GEMINI_TEXT_MODEL?: string;
@@ -174,6 +178,63 @@ Return strictly JSON format:
 `.trim();
 }
 
+function seasonFromMonth(month1To12: number) {
+  if (month1To12 >= 3 && month1To12 <= 5) return 'spring';
+  if (month1To12 >= 6 && month1To12 <= 8) return 'summer';
+  if (month1To12 >= 9 && month1To12 <= 11) return 'autumn';
+  return 'winter';
+}
+
+function buildTopicPrompt(params: { keyword?: string; todayISO: string; monthName: string; weekdayName: string; season: string }) {
+  const keyword = (params.keyword ?? '').trim();
+
+  const base = `
+You are an expert English tutor for Korean students.
+Generate ONE short English learning text for the user to study.
+
+Constraints:
+- Output must be in English only.
+- Output must be either:
+  - a single sentence, OR
+  - a short paragraph with at most 5 sentences.
+- Prefer natural, idiomatic English suitable for intermediate learners.
+- Avoid sensitive/political/explicit content.
+`.trim();
+
+  if (keyword) {
+    return `
+${base}
+
+Topic keyword: "${keyword}"
+
+Create a text that is clearly related to the keyword. It can be:
+- a proverb / saying / quote,
+- a thought-provoking question,
+- a brief explanation, or
+- a mini story snippet.
+
+Return strictly JSON:
+{ "text": "..." }
+`.trim();
+  }
+
+  return `
+${base}
+
+No topic keyword provided.
+Use today's context to inspire the text:
+- Date: ${params.todayISO}
+- Month: ${params.monthName}
+- Weekday: ${params.weekdayName}
+- Season: ${params.season}
+
+Create a proverb/saying/quote OR a reflective short paragraph (<=5 sentences) that fits today's context.
+
+Return strictly JSON:
+{ "text": "..." }
+`.trim();
+}
+
 async function handleAnalyze(req: Request, env: Env) {
   const body = (await req.json()) as AnalyzeRequest;
   if (!body?.inputText?.trim()) return json({ error: 'inputText is required' }, { status: 400 });
@@ -200,6 +261,45 @@ async function handleAnalyze(req: Request, env: Env) {
   try {
     const parsed = JSON.parse(raw);
     return json(parsed);
+  } catch {
+    return json({ error: 'Invalid JSON from Gemini', raw }, { status: 502 });
+  }
+}
+
+async function handleTopic(req: Request, env: Env) {
+  const body = (await req.json().catch(() => ({}))) as TopicRequest;
+  const keyword = typeof body?.keyword === 'string' ? body.keyword : '';
+
+  const now = new Date();
+  const monthName = now.toLocaleString('en-US', { month: 'long' });
+  const weekdayName = now.toLocaleString('en-US', { weekday: 'long' });
+  const month1To12 = now.getMonth() + 1;
+  const season = seasonFromMonth(month1To12);
+  const todayISO = now.toISOString().slice(0, 10);
+
+  const model = env.GEMINI_TEXT_MODEL || 'gemini-1.5-flash-latest';
+  const systemPrompt = buildTopicPrompt({ keyword, todayISO, monthName, weekdayName, season });
+
+  const resp = await geminiGenerateContent(env, model, {
+    contents: [{ parts: [{ text: 'Generate today topic.' }] }],
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    generationConfig: { responseMimeType: 'application/json' },
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    return json({ error: 'Gemini error', status: resp.status, detail: text }, { status: resp.status });
+  }
+
+  const data: any = await resp.json();
+  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) return json({ error: 'No content from Gemini' }, { status: 502 });
+
+  try {
+    const parsed = JSON.parse(raw);
+    const text = typeof parsed?.text === 'string' ? parsed.text : '';
+    if (!text.trim()) return json({ error: 'Invalid topic payload', raw }, { status: 502 });
+    return json({ text });
   } catch {
     return json({ error: 'Invalid JSON from Gemini', raw }, { status: 502 });
   }
@@ -301,6 +401,7 @@ export default {
       if (req.method === 'POST' && url.pathname === '/api/analyze') res = await handleAnalyze(req, env);
       else if (req.method === 'POST' && url.pathname === '/api/quiz') res = await handleQuiz(req, env);
       else if (req.method === 'POST' && url.pathname === '/api/tts') res = await handleTts(req, env);
+      else if (req.method === 'POST' && url.pathname === '/api/topic') res = await handleTopic(req, env);
       else res = json({ error: 'Not found' }, { status: 404 });
 
       return withCors(req, res);
