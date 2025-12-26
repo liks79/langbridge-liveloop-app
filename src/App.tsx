@@ -12,6 +12,10 @@ const App = () => {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  // Today Topic (NEW)
+  const [topicKeyword, setTopicKeyword] = useState('');
+  const [topicLoading, setTopicLoading] = useState(false);
   
   // Quiz States
   const [quizData, setQuizData] = useState<any>(null);
@@ -184,6 +188,45 @@ const App = () => {
         setSpeakingText(null);
         setTtsSource(null);
       }
+    }
+  };
+
+  const handleGenerateTodayTopic = async () => {
+    if (topicLoading) return;
+    setTopicLoading(true);
+    setError('');
+
+    // Starting a new study item -> clear previous result/quiz UI.
+    setResult(null);
+    setQuizData(null);
+    setUserAnswers({});
+    setShowScore(false);
+
+    try {
+      const response = await fetch(`${API_BASE}/api/topic`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword: topicKeyword.trim() || undefined }),
+      });
+
+      if (!response.ok) throw new Error(`Topic 생성 실패: ${response.status}`);
+      const data = await response.json();
+      const text = (data?.text as string | undefined) ?? '';
+      if (!text.trim()) throw new Error('Empty topic');
+
+      setInputText(text);
+      window.setTimeout(() => {
+        try {
+          document.querySelector('textarea')?.focus();
+        } catch {
+          // ignore
+        }
+      }, 0);
+    } catch (err) {
+      setError('토픽을 생성하는 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.');
+      console.error(err);
+    } finally {
+      setTopicLoading(false);
     }
   };
 
@@ -650,12 +693,42 @@ const App = () => {
             </div>
           </div>
 
-          <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+          <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <input
+                value={topicKeyword}
+                onChange={(e) => setTopicKeyword(e.target.value)}
+                placeholder="키워드 입력"
+                className="flex-1 sm:w-56 px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              />
+              <button
+                onClick={handleGenerateTodayTopic}
+                disabled={topicLoading}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm shadow-sm transition-all whitespace-nowrap ${
+                  topicLoading
+                    ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 active:scale-[0.99]'
+                }`}
+                title="Gemini로 오늘의 학습 문장을 생성합니다"
+              >
+                {topicLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    생성 중...
+                  </>
+                ) : (
+                  <>
+                    <Globe className="w-4 h-4" />
+                    오늘의 토픽
+                  </>
+                )}
+              </button>
+            </div>
             <button
               onClick={() => handleAnalyze()}
-              disabled={loading || !inputText.trim()}
+              disabled={loading || topicLoading || !inputText.trim()}
               className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white shadow-lg transition-all ${
-                loading || !inputText.trim()
+                loading || topicLoading || !inputText.trim()
                   ? 'bg-slate-300 cursor-not-allowed shadow-none'
                   : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-indigo-200 active:scale-95'
               }`}
