@@ -707,7 +707,7 @@ const App = () => {
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm shadow-sm transition-all whitespace-nowrap ${
                   topicLoading
                     ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
-                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 active:scale-[0.99]'
+                    : 'lb-today-topic-btn bg-white border border-slate-200 text-slate-700 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 active:scale-[0.99]'
                 }`}
                 title="Gemini로 오늘의 학습 문장을 생성합니다"
               >
