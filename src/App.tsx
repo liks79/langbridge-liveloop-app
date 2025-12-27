@@ -341,6 +341,16 @@ const App = () => {
         });
       }
 
+      // Automatically generate Context Dialogue after analysis (based on the English text)
+      // For EtoK, it's textToAnalyze. For KtoE, use the first suggestion if available.
+      const dialogueSourceText = computedMode === 'EtoK' 
+        ? textToAnalyze 
+        : (parsedContent.variations?.[0]?.text || textToAnalyze);
+      
+      if (dialogueSourceText) {
+        void handleGenerateDialogue(dialogueSourceText).catch(() => {});
+      }
+
       // 히스토리 추가 (최신 100개 유지)
       const newItem = {
         id: Date.now(),
@@ -424,23 +434,25 @@ const App = () => {
     }
   };
 
-  const handleGenerateDialogue = async () => {
-    if (!inputText.trim()) return;
+  const handleGenerateDialogue = async (textOverride?: string) => {
+    const contextText = (textOverride ?? inputText).trim();
+    if (!contextText) return;
     if (dialogueLoading) return;
     setDialogueLoading(true);
+    setDialogue(null); // Clear previous dialogue
     setError('');
     try {
       const response = await fetch(`${API_BASE}/api/dialogue`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: inputText }),
+        body: JSON.stringify({ text: contextText }),
       });
       if (!response.ok) throw new Error('Dialogue 생성 실패');
       const parsed = await response.json();
       setDialogue(parsed);
     } catch (err) {
       console.error(err);
-      setError('실전 회화를 생성하는 중 문제가 발생했습니다.');
+      // Don't show global error for dialogue, just log it.
     } finally {
       setDialogueLoading(false);
     }
@@ -1085,6 +1097,52 @@ const App = () => {
                         <p className="text-slate-700 mt-1 text-sm">{result.nuance}</p>
                       </div>
                     )}
+
+                    {(dialogueLoading || dialogue) && (
+                      <div className="mt-8 pt-8 border-t border-slate-100">
+                        <div className="text-xs text-indigo-500 font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          실전 회화 (Context Dialogue)
+                        </div>
+                        
+                        {dialogueLoading ? (
+                          <div className="flex flex-col items-center py-10 text-slate-400 gap-3">
+                            <Loader2 className="w-8 h-8 animate-spin" />
+                            <p className="text-sm font-medium">실전 회화 생성 중...</p>
+                          </div>
+                        ) : dialogue?.turns?.length > 0 ? (
+                          <div className="space-y-3">
+                            {dialogue.turns.map((t: any, i: number) => (
+                              <div
+                                key={i}
+                                className={`p-4 rounded-2xl border ${
+                                  t.speaker === 'A' ? 'bg-indigo-50/50 border-indigo-100' : 'bg-slate-50 border-slate-100'
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">Speaker {t.speaker || '?'}</div>
+                                    <div className="text-sm font-bold text-slate-800 leading-snug">{t.en}</div>
+                                    {t.ko && <div className="text-xs text-slate-500 mt-1.5 font-medium">{t.ko}</div>}
+                                  </div>
+                                  <button
+                                    onClick={() => speak(t.en)}
+                                    className={`shrink-0 p-2 rounded-xl transition-all ${
+                                      isSpeaking && speakingText === t.en
+                                        ? 'bg-indigo-600 text-white shadow-md'
+                                        : 'text-slate-400 hover:text-indigo-600 hover:bg-white'
+                                    }`}
+                                    title="Listen"
+                                  >
+                                    <Volume2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
                   </>
                 ) : (
                   /* Kor Input -> Eng Result */
@@ -1120,6 +1178,52 @@ const App = () => {
                         </div>
                       ))}
                     </div>
+
+                    {(dialogueLoading || dialogue) && (
+                      <div className="mt-8 pt-8 border-t border-slate-100">
+                        <div className="text-xs text-indigo-500 font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          실전 회화 (Context Dialogue)
+                        </div>
+                        
+                        {dialogueLoading ? (
+                          <div className="flex flex-col items-center py-10 text-slate-400 gap-3">
+                            <Loader2 className="w-8 h-8 animate-spin" />
+                            <p className="text-sm font-medium">실전 회화 생성 중...</p>
+                          </div>
+                        ) : dialogue?.turns?.length > 0 ? (
+                          <div className="space-y-3">
+                            {dialogue.turns.map((t: any, i: number) => (
+                              <div
+                                key={i}
+                                className={`p-4 rounded-2xl border ${
+                                  t.speaker === 'A' ? 'bg-indigo-50/50 border-indigo-100' : 'bg-slate-50 border-slate-100'
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">Speaker {t.speaker || '?'}</div>
+                                    <div className="text-sm font-bold text-slate-800 leading-snug">{t.en}</div>
+                                    {t.ko && <div className="text-xs text-slate-500 mt-1.5 font-medium">{t.ko}</div>}
+                                  </div>
+                                  <button
+                                    onClick={() => speak(t.en)}
+                                    className={`shrink-0 p-2 rounded-xl transition-all ${
+                                      isSpeaking && speakingText === t.en
+                                        ? 'bg-indigo-600 text-white shadow-md'
+                                        : 'text-slate-400 hover:text-indigo-600 hover:bg-white'
+                                    }`}
+                                    title="Listen"
+                                  >
+                                    <Volume2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -1316,64 +1420,6 @@ const App = () => {
                 </div>
               )}
             </div>
-
-            {/* Context Dialogue (NEW) */}
-            <div className="mt-8 border-t border-slate-200 pt-8">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="text-sm text-slate-400 font-medium">실전 회화 (Context Dialogue)</div>
-                <button
-                  onClick={handleGenerateDialogue}
-                  disabled={dialogueLoading || !inputText.trim()}
-                  className={`px-5 py-2.5 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2 w-full sm:w-auto justify-center ${
-                    dialogueLoading || !inputText.trim()
-                      ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
-                      : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-[0.99]'
-                  }`}
-                >
-                  {dialogueLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" /> 생성 중...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4" /> 실전 회화 생성
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {dialogue?.turns?.length > 0 && (
-                <div className="mt-4 bg-white rounded-2xl border border-indigo-100 shadow-sm overflow-hidden">
-                  <div className="px-4 py-3 bg-indigo-900 text-white font-bold">Roleplay Dialogue</div>
-                  <div className="p-4 space-y-3">
-                    {dialogue.turns.map((t: any, i: number) => (
-                      <div
-                        key={i}
-                        className={`p-3 rounded-xl border ${
-                          t.speaker === 'A' ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="text-xs font-extrabold text-slate-500 mb-1">Speaker {t.speaker || '?'}</div>
-                            <div className="text-sm font-semibold text-slate-900">{t.en}</div>
-                            {t.ko && <div className="text-xs text-slate-600 mt-1">{t.ko}</div>}
-                          </div>
-                          <button
-                            onClick={() => speak(t.en)}
-                            className="shrink-0 p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                            title="Listen"
-                          >
-                            <Volume2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
           </div>
         )}
         
