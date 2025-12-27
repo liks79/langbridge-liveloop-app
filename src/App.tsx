@@ -1,11 +1,25 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { BookOpen, Sparkles, GraduationCap, Copy, Check, RotateCcw, Search, Volume2, Globe, Loader2, HelpCircle, CheckCircle2, XCircle, Trophy, History, X, Trash2, Clock } from 'lucide-react';
+import { BookOpen, Sparkles, GraduationCap, Copy, Check, RotateCcw, Search, Volume2, Globe, Loader2, HelpCircle, CheckCircle2, XCircle, Trophy, History, X, Trash2, Clock, Flame, Bookmark, BookmarkPlus } from 'lucide-react';
+import { loadDailyExpression, saveDailyExpression, isDailyExpressionFresh } from './lib/dailyExpressionStore';
+import { loadStreak, bumpStreak } from './lib/streakStore';
+import { loadVocab, addVocab, removeVocab, clearVocab, type VocabItem } from './lib/vocabStore';
 
 const App = () => {
   // API base:
   // - Production: keep empty -> same-origin calls to `/api/*` via Worker Route on `langbridge.liveloop.app`
   // - Preview/dev: set `VITE_API_BASE_URL` (e.g. https://<worker>.workers.dev) to avoid domain mismatch
   const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+
+  // Daily Expression (NEW)
+  const [dailyExpression, setDailyExpression] = useState<any | null>(() => loadDailyExpression());
+  const [dailyLoading, setDailyLoading] = useState(false);
+
+  // Study Streak (NEW)
+  const [streakState, setStreakState] = useState(() => loadStreak());
+
+  // My Vocabulary (NEW)
+  const [vocab, setVocab] = useState<VocabItem[]>(() => loadVocab());
+  const [showVocab, setShowVocab] = useState(false);
 
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,6 +38,10 @@ const App = () => {
   const [showScore, setShowScore] = useState(false);
   const [celebrationKey, setCelebrationKey] = useState(0);
   const [showCelebration, setShowCelebration] = useState(false);
+
+  // Context Dialogue (NEW)
+  const [dialogue, setDialogue] = useState<any | null>(null);
+  const [dialogueLoading, setDialogueLoading] = useState(false);
 
   // History States (NEW)
   const [history, setHistory] = useState<any[]>(() => {
@@ -44,6 +62,7 @@ const App = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speakingText, setSpeakingText] = useState<string | null>(null);
   const [ttsSource, setTtsSource] = useState<'gemini' | 'browser' | null>(null);
+  const [ttsRate, setTtsRate] = useState<0.75 | 1.0>(1.0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
   // 오디오 캐시 저장소 (Key: 텍스트, Value: Blob URL)
@@ -59,6 +78,37 @@ const App = () => {
   useEffect(() => {
     localStorage.setItem('english-live-loop-history', JSON.stringify(history));
   }, [history]);
+
+  // Daily Expression: load once per day (cached)
+  useEffect(() => {
+    if (isDailyExpressionFresh(dailyExpression)) return;
+    let cancelled = false;
+    setDailyLoading(true);
+    fetch(`${API_BASE}/api/daily-expression`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((data) => {
+        if (cancelled) return;
+        setDailyExpression(data);
+        try {
+          saveDailyExpression(data);
+        } catch {
+          // ignore
+        }
+      })
+      .catch(() => {
+        // ignore (keep app usable even if daily expression fails)
+      })
+      .finally(() => {
+        if (!cancelled) setDailyLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [API_BASE, dailyExpression]);
 
   // 1. 언어 자동 감지 로직
   useEffect(() => {
@@ -138,7 +188,7 @@ const App = () => {
         setTtsSource('browser');
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'ko-KR'; // 한국어 설정
-        utterance.rate = 1.0;
+        utterance.rate = ttsRate;
         utterance.onend = () => {
           setIsSpeaking(false);
           setSpeakingText(null);
@@ -158,6 +208,7 @@ const App = () => {
       const audioUrl = await getAudioUrl(text);
       
       const audio = new Audio(audioUrl);
+      audio.playbackRate = ttsRate;
       audioRef.current = audio;
       
       audio.onended = () => {
@@ -176,7 +227,7 @@ const App = () => {
       if (window.speechSynthesis) {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'en-US';
-        utterance.rate = 0.9;
+        utterance.rate = ttsRate;
         utterance.onend = () => {
           setIsSpeaking(false);
           setSpeakingText(null);
@@ -215,6 +266,8 @@ const App = () => {
       if (!text.trim()) throw new Error('Empty topic');
 
       setInputText(text);
+      // Count this as a study action (generating study text).
+      setStreakState(bumpStreak());
       window.setTimeout(() => {
         try {
           document.querySelector('textarea')?.focus();
@@ -262,6 +315,8 @@ const App = () => {
 
       const parsedContent = await response.json();
       setResult(parsedContent);
+      // Count successful analysis as a study day.
+      setStreakState(bumpStreak());
 
       // 히스토리 추가 (최신 100개 유지)
       const newItem = {
@@ -308,6 +363,15 @@ const App = () => {
     }
   };
 
+  const saveToVocab = (item: { term: string; meaning?: string; exampleEn?: string; exampleKo?: string }) => {
+    try {
+      const next = addVocab(item);
+      setVocab(next);
+    } catch {
+      // ignore
+    }
+  };
+
   // 퀴즈 생성 함수
   const handleGenerateQuiz = async () => {
     if (!result) return;
@@ -334,6 +398,28 @@ const App = () => {
       setError('퀴즈를 생성하는 중 문제가 발생했습니다.');
     } finally {
       setQuizLoading(false);
+    }
+  };
+
+  const handleGenerateDialogue = async () => {
+    if (!inputText.trim()) return;
+    if (dialogueLoading) return;
+    setDialogueLoading(true);
+    setError('');
+    try {
+      const response = await fetch(`${API_BASE}/api/dialogue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: inputText }),
+      });
+      if (!response.ok) throw new Error('Dialogue 생성 실패');
+      const parsed = await response.json();
+      setDialogue(parsed);
+    } catch (err) {
+      console.error(err);
+      setError('실전 회화를 생성하는 중 문제가 발생했습니다.');
+    } finally {
+      setDialogueLoading(false);
     }
   };
 
@@ -614,6 +700,71 @@ const App = () => {
         </div>
       )}
 
+      {/* Vocabulary Sidebar/Overlay (NEW) */}
+      {showVocab && (
+        <div className="fixed inset-0 z-50 flex justify-end animate-fade-in">
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setShowVocab(false)} />
+          <div className="relative w-full max-w-sm bg-white h-full shadow-2xl overflow-hidden flex flex-col animate-slide-in-right">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-indigo-600 text-white">
+              <div className="flex items-center gap-2 font-bold">
+                <Bookmark className="w-5 h-5" />
+                나만의 단어장 (최근 {vocab.length}개)
+              </div>
+              <button onClick={() => setShowVocab(false)} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {vocab.length === 0 ? (
+                <div className="text-center py-10 text-slate-400">
+                  <Bookmark className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>아직 저장된 단어가 없습니다.</p>
+                  <p className="text-sm">키워드 카드에서 저장해 보세요.</p>
+                </div>
+              ) : (
+                vocab.map((item) => (
+                  <div key={item.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-extrabold text-slate-900 truncate">{item.term}</div>
+                        {item.meaning && <div className="text-sm text-slate-600 mt-0.5">{item.meaning}</div>}
+                        {item.exampleEn && (
+                          <div className="text-xs text-slate-500 mt-2 italic">"{item.exampleEn}"</div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setVocab(removeVocab(item.id))}
+                        className="shrink-0 p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        title="삭제"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {vocab.length > 0 && (
+              <div className="p-4 border-t border-slate-100 bg-slate-50">
+                <button
+                  onClick={() => {
+                    if (window.confirm('단어장을 모두 비울까요?')) {
+                      clearVocab();
+                      setVocab([]);
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-2 text-sm text-red-500 hover:text-red-700 py-2 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" /> 단어장 전체 삭제
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -640,6 +791,43 @@ const App = () => {
               </span>
             </div>
             <button
+              onClick={() => setShowVocab(true)}
+              className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors relative"
+              title="나만의 단어장"
+            >
+              <Bookmark className="w-5 h-5" />
+              {vocab.length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 text-[10px] font-extrabold bg-indigo-600 text-white rounded-full px-1.5 py-0.5 shadow">
+                  {vocab.length > 99 ? '99+' : vocab.length}
+                </span>
+              )}
+            </button>
+            <div className="hidden sm:flex items-center gap-1 bg-white border border-slate-200 rounded-full p-1 text-xs font-bold">
+              <button
+                onClick={() => setTtsRate(0.75)}
+                className={`px-2 py-1 rounded-full transition-colors ${
+                  ttsRate === 0.75 ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+                }`}
+                title="Shadowing speed 0.75x"
+              >
+                0.75x
+              </button>
+              <button
+                onClick={() => setTtsRate(1.0)}
+                className={`px-2 py-1 rounded-full transition-colors ${
+                  ttsRate === 1.0 ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+                }`}
+                title="Shadowing speed 1.0x"
+              >
+                1.0x
+              </button>
+            </div>
+            <div className="flex items-center gap-2 text-xs font-bold text-orange-700 bg-orange-50 border border-orange-100 px-3 py-1 rounded-full">
+              <Flame className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Streak</span>
+              <span>{streakState.streak}d</span>
+            </div>
+            <button
               onClick={() => setShowHistory(true)}
               className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors relative"
               title="학습 기록 보기"
@@ -654,6 +842,38 @@ const App = () => {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+
+        {/* Daily Expression (NEW) */}
+        {dailyExpression?.expression && (
+          <div className="bg-white rounded-2xl border border-indigo-100 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2 font-bold">
+                <Sparkles className="w-4 h-4" />
+                오늘의 표현
+              </div>
+              {dailyLoading && (
+                <div className="text-xs text-white/80 flex items-center gap-2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  불러오는 중...
+                </div>
+              )}
+            </div>
+            <div className="p-4 space-y-2">
+              <div className="text-lg font-extrabold text-slate-900">{dailyExpression.expression}</div>
+              {dailyExpression.meaningKo && (
+                <div className="text-sm text-slate-600 break-keep">{dailyExpression.meaningKo}</div>
+              )}
+              {dailyExpression.exampleEn && (
+                <div className="mt-2 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <div className="text-sm font-semibold text-slate-800 italic">"{dailyExpression.exampleEn}"</div>
+                  {dailyExpression.exampleKo && (
+                    <div className="text-xs text-slate-500 mt-1">{dailyExpression.exampleKo}</div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         
         {/* Input Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden transition-all duration-300">
@@ -862,6 +1082,20 @@ const App = () => {
                            <Volume2 className="w-4 h-4" />
                          )}
                       </button>
+                      <button
+                        onClick={() =>
+                          saveToVocab({
+                            term: item.word,
+                            meaning: detectedMode === 'EtoK' ? item.meaning : item.meaning, // keep as-is
+                            exampleEn: detectedMode === 'EtoK' ? item.usage : undefined,
+                            exampleKo: detectedMode === 'EtoK' ? item.usageTranslation : undefined,
+                          })
+                        }
+                        className="p-1 rounded-full text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                        title="단어장에 저장"
+                      >
+                        <BookmarkPlus className="w-4 h-4" />
+                      </button>
                     </div>
                     <Search className="w-4 h-4 text-slate-300 group-hover:text-indigo-300 transition-colors" />
                   </div>
@@ -1008,6 +1242,63 @@ const App = () => {
                       </button>
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+
+            {/* Context Dialogue (NEW) */}
+            <div className="mt-8 border-t border-slate-200 pt-8">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="text-sm text-slate-400 font-medium">실전 회화 (Context Dialogue)</div>
+                <button
+                  onClick={handleGenerateDialogue}
+                  disabled={dialogueLoading || !inputText.trim()}
+                  className={`px-5 py-2.5 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2 w-full sm:w-auto justify-center ${
+                    dialogueLoading || !inputText.trim()
+                      ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                      : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-[0.99]'
+                  }`}
+                >
+                  {dialogueLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> 생성 중...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" /> 실전 회화 생성
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {dialogue?.turns?.length > 0 && (
+                <div className="mt-4 bg-white rounded-2xl border border-indigo-100 shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 bg-indigo-900 text-white font-bold">Roleplay Dialogue</div>
+                  <div className="p-4 space-y-3">
+                    {dialogue.turns.map((t: any, i: number) => (
+                      <div
+                        key={i}
+                        className={`p-3 rounded-xl border ${
+                          t.speaker === 'A' ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-xs font-extrabold text-slate-500 mb-1">Speaker {t.speaker || '?'}</div>
+                            <div className="text-sm font-semibold text-slate-900">{t.en}</div>
+                            {t.ko && <div className="text-xs text-slate-600 mt-1">{t.ko}</div>}
+                          </div>
+                          <button
+                            onClick={() => speak(t.en)}
+                            className="shrink-0 p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                            title="Listen"
+                          >
+                            <Volume2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
