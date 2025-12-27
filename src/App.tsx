@@ -42,6 +42,8 @@ const App = () => {
   // Context Dialogue (NEW)
   const [dialogue, setDialogue] = useState<any | null>(null);
   const [dialogueLoading, setDialogueLoading] = useState(false);
+  const [currentDialogueIndex, setCurrentDialogueIndex] = useState<number | null>(null);
+  const [isPlayingFullDialogue, setIsPlayingFullDialogue] = useState(false);
 
   // History States (NEW)
   const [history, setHistory] = useState<any[]>(() => {
@@ -72,18 +74,20 @@ const App = () => {
   const inFlightRequests = useRef<Map<string, Promise<string>>>(new Map());
 
   // 오디오 URL 가져오기 (Worker `/api/tts` 사용)
-  const getAudioUrl = async (text: string, retryCount = 0): Promise<string> => {
+  const getAudioUrl = async (text: string, voice?: string, retryCount = 0): Promise<string> => {
     const cleanedText = text.trim();
     if (!cleanedText) return '';
 
+    const cacheKey = voice ? `${voice}:${cleanedText}` : cleanedText;
+
     // 1. 캐시 확인
-    if (audioCache.current.has(cleanedText)) {
-      return audioCache.current.get(cleanedText)!;
+    if (audioCache.current.has(cacheKey)) {
+      return audioCache.current.get(cacheKey)!;
     }
 
     // 2. 이미 동일한 텍스트로 요청이 진행 중인지 확인
-    if (inFlightRequests.current.has(cleanedText)) {
-      return inFlightRequests.current.get(cleanedText)!;
+    if (inFlightRequests.current.has(cacheKey)) {
+      return inFlightRequests.current.get(cacheKey)!;
     }
 
     const fetchPromise = (async () => {
@@ -91,30 +95,30 @@ const App = () => {
         const response = await fetch(`${API_BASE}/api/tts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: cleanedText }),
+          body: JSON.stringify({ text: cleanedText, voice }),
         });
 
         // 429 오류 처리: 지수 백오프(Exponential Backoff) 재시도
         if (response.status === 429 && retryCount < 2) {
           const waitTime = Math.pow(2, retryCount) * 1000;
           await new Promise((resolve) => setTimeout(resolve, waitTime));
-          return getAudioUrl(cleanedText, retryCount + 1);
+          return getAudioUrl(cleanedText, voice, retryCount + 1);
         }
 
         if (!response.ok) throw new Error('TTS API Error: ' + response.status);
 
         const audioBlob = await response.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
-        audioCache.current.set(cleanedText, audioUrl);
+        audioCache.current.set(cacheKey, audioUrl);
         return audioUrl;
       } finally {
         // 요청이 끝나면 목록에서 제거
-        inFlightRequests.current.delete(cleanedText);
+        inFlightRequests.current.delete(cacheKey);
       }
     })();
 
     // 진행 중인 요청 목록에 등록
-    inFlightRequests.current.set(cleanedText, fetchPromise);
+    inFlightRequests.current.set(cacheKey, fetchPromise);
     return fetchPromise;
   };
   // NOTE:
@@ -174,7 +178,7 @@ const App = () => {
   }, [inputText]);
 
   // TTS 재생 함수
-  const speak = async (text: string) => {
+  const speak = async (text: string, voice?: string): Promise<void> => {
     if (!text) return;
     
     if (isSpeaking && speakingText === text) return;
@@ -189,66 +193,73 @@ const App = () => {
       window.speechSynthesis.cancel();
     }
 
-    // 한글이 포함된 경우 브라우저 TTS 사용 (AI TTS는 영문 최적화 및 오류 방지)
-    if (/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(text)) {
-      if (window.speechSynthesis) {
-        setIsSpeaking(true);
-        setSpeakingText(text);
-        setTtsSource('browser');
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'ko-KR'; // 한국어 설정
-        utterance.rate = ttsRate;
-        utterance.onend = () => {
-          setIsSpeaking(false);
-          setSpeakingText(null);
-          setTtsSource(null);
-        };
-        window.speechSynthesis.speak(utterance);
+    return new Promise((resolve) => {
+      // 한글이 포함된 경우 브라우저 TTS 사용 (AI TTS는 영문 최적화 및 오류 방지)
+      if (/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(text)) {
+        if (window.speechSynthesis) {
+          setIsSpeaking(true);
+          setSpeakingText(text);
+          setTtsSource('browser');
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'ko-KR'; // 한국어 설정
+          utterance.rate = ttsRate;
+          utterance.onend = () => {
+            setIsSpeaking(false);
+            setSpeakingText(null);
+            setTtsSource(null);
+            resolve();
+          };
+          utterance.onerror = () => {
+            setIsSpeaking(false);
+            setSpeakingText(null);
+            setTtsSource(null);
+            resolve();
+          };
+          window.speechSynthesis.speak(utterance);
+        } else {
+          resolve();
+        }
+        return;
       }
-      return;
-    }
 
-    // 영어인 경우 AI TTS 시도
-    setIsSpeaking(true);
-    setSpeakingText(text);
-    setTtsSource('gemini');
+      // 영어인 경우 AI TTS 시도
+      setIsSpeaking(true);
+      setSpeakingText(text);
+      setTtsSource('gemini');
 
-    try {
-      const audioUrl = await getAudioUrl(text);
-      
-      const audio = new Audio(audioUrl);
-      audio.playbackRate = ttsRate;
-      audioRef.current = audio;
-      
-      audio.onended = () => {
+      const cleanup = () => {
         setIsSpeaking(false);
         setSpeakingText(null);
         setTtsSource(null);
+        resolve();
       };
-      
-      await audio.play();
 
-    } catch (err) {
-      // 오류 발생 시 경고 로그만 남기고 브라우저 TTS로 폴백
-      console.warn("AI TTS Failed, falling back to browser TTS", err);
-      setTtsSource('browser');
-      
-      if (window.speechSynthesis) {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'en-US';
-        utterance.rate = ttsRate;
-        utterance.onend = () => {
-          setIsSpeaking(false);
-          setSpeakingText(null);
-          setTtsSource(null);
-        };
-        window.speechSynthesis.speak(utterance);
-      } else {
-        setIsSpeaking(false);
-        setSpeakingText(null);
-        setTtsSource(null);
-      }
-    }
+      getAudioUrl(text, voice)
+        .then((audioUrl) => {
+          const audio = new Audio(audioUrl);
+          audio.playbackRate = ttsRate;
+          audioRef.current = audio;
+          audio.onended = cleanup;
+          audio.onerror = cleanup;
+          return audio.play();
+        })
+        .catch((err) => {
+          // 오류 발생 시 경고 로그만 남기고 브라우저 TTS로 폴백
+          console.warn('AI TTS Failed, falling back to browser TTS', err);
+          setTtsSource('browser');
+
+          if (window.speechSynthesis) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            utterance.rate = ttsRate;
+            utterance.onend = cleanup;
+            utterance.onerror = cleanup;
+            window.speechSynthesis.speak(utterance);
+          } else {
+            cleanup();
+          }
+        });
+    });
   };
 
   const handleGenerateTodayTopic = async () => {
@@ -455,6 +466,26 @@ const App = () => {
       // Don't show global error for dialogue, just log it.
     } finally {
       setDialogueLoading(false);
+    }
+  };
+
+  const handlePlayFullDialogue = async () => {
+    if (!dialogue?.turns?.length || isPlayingFullDialogue) return;
+    setIsPlayingFullDialogue(true);
+    try {
+      for (let i = 0; i < dialogue.turns.length; i++) {
+        setCurrentDialogueIndex(i);
+        const turn = dialogue.turns[i];
+        const voice = turn.speaker === 'A' ? 'WOMAN' : 'MAN';
+        await speak(turn.en, voice);
+        // Brief pause between speakers
+        await new Promise((r) => setTimeout(r, 600));
+      }
+    } catch (err) {
+      console.error('Full dialogue playback error:', err);
+    } finally {
+      setIsPlayingFullDialogue(false);
+      setCurrentDialogueIndex(null);
     }
   };
 
@@ -1100,45 +1131,95 @@ const App = () => {
 
                     {(dialogueLoading || dialogue) && (
                       <div className="mt-8 pt-8 border-t border-slate-100">
-                        <div className="text-xs text-indigo-500 font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
-                          <Sparkles className="w-3.5 h-3.5" />
-                          실전 회화 (Context Dialogue)
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="text-xs text-indigo-500 font-bold uppercase tracking-wider flex items-center gap-2">
+                            <Sparkles className="w-3.5 h-3.5" />
+                            실전 회화 (Context Dialogue)
+                          </div>
+                          {dialogue?.turns?.length > 0 && (
+                            <button
+                              onClick={handlePlayFullDialogue}
+                              disabled={isPlayingFullDialogue}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                                isPlayingFullDialogue
+                                  ? 'bg-indigo-100 text-indigo-400 cursor-not-allowed'
+                                  : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm active:scale-95'
+                              }`}
+                            >
+                              {isPlayingFullDialogue ? (
+                                <>
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  재생 중...
+                                </>
+                              ) : (
+                                <>
+                                  <Volume2 className="w-3 h-3" />
+                                  전체 대화 듣기
+                                </>
+                              )}
+                            </button>
+                          )}
                         </div>
                         
                         {dialogueLoading ? (
-                          <div className="flex flex-col items-center py-10 text-slate-400 gap-3">
+                          <div className="flex flex-col items-center py-10 text-slate-400 gap-3 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
                             <Loader2 className="w-8 h-8 animate-spin" />
                             <p className="text-sm font-medium">실전 회화 생성 중...</p>
                           </div>
                         ) : dialogue?.turns?.length > 0 ? (
-                          <div className="space-y-3">
-                            {dialogue.turns.map((t: any, i: number) => (
-                              <div
-                                key={i}
-                                className={`p-4 rounded-2xl border ${
-                                  t.speaker === 'A' ? 'bg-indigo-50/50 border-indigo-100' : 'bg-slate-50 border-slate-100'
-                                }`}
-                              >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <div className="text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">Speaker {t.speaker || '?'}</div>
-                                    <div className="text-sm font-bold text-slate-800 leading-snug">{t.en}</div>
-                                    {t.ko && <div className="text-xs text-slate-500 mt-1.5 font-medium">{t.ko}</div>}
+                          <div className="space-y-4">
+                            {dialogue.turns.map((t: any, i: number) => {
+                              const isA = t.speaker === 'A';
+                              const isCurrent = currentDialogueIndex === i;
+                              return (
+                                <div
+                                  key={i}
+                                  className={`flex w-full ${isA ? 'justify-start' : 'justify-end'} animate-fade-in-up`}
+                                >
+                                  <div className={`relative max-w-[85%] group`}>
+                                    <div className={`mb-1 flex items-center gap-2 ${isA ? 'flex-row' : 'flex-row-reverse'}`}>
+                                      <span className={`text-[9px] font-black uppercase tracking-widest ${isA ? 'text-indigo-400' : 'text-violet-400'}`}>
+                                        Speaker {t.speaker}
+                                      </span>
+                                    </div>
+                                    
+                                    <div className={`p-4 rounded-2xl border transition-all ${
+                                      isCurrent 
+                                        ? 'ring-2 ring-indigo-500 shadow-md border-transparent' 
+                                        : 'shadow-sm border-slate-100'
+                                    } ${
+                                      isA 
+                                        ? 'bg-white rounded-tl-none border-slate-200' 
+                                        : 'bg-indigo-50/40 rounded-tr-none border-indigo-100'
+                                    }`}>
+                                      <div className={`flex items-start gap-3 ${isA ? 'flex-row' : 'flex-row-reverse'}`}>
+                                        <div className={`flex-1 min-w-0 ${isA ? 'text-left' : 'text-right'}`}>
+                                          <div className="text-sm font-bold text-slate-800 leading-snug mb-1">
+                                            {t.en}
+                                          </div>
+                                          {t.ko && (
+                                            <div className="text-xs text-slate-500 font-medium break-keep">
+                                              {t.ko}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <button
+                                          onClick={() => speak(t.en, isA ? 'WOMAN' : 'MAN')}
+                                          className={`shrink-0 p-1.5 rounded-lg transition-all ${
+                                            isSpeaking && speakingText === t.en
+                                              ? 'bg-indigo-600 text-white'
+                                              : 'text-slate-300 hover:text-indigo-600 hover:bg-white'
+                                          }`}
+                                          title="Listen"
+                                        >
+                                          <Volume2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <button
-                                    onClick={() => speak(t.en)}
-                                    className={`shrink-0 p-2 rounded-xl transition-all ${
-                                      isSpeaking && speakingText === t.en
-                                        ? 'bg-indigo-600 text-white shadow-md'
-                                        : 'text-slate-400 hover:text-indigo-600 hover:bg-white'
-                                    }`}
-                                    title="Listen"
-                                  >
-                                    <Volume2 className="w-4 h-4" />
-                                  </button>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         ) : null}
                       </div>
@@ -1181,45 +1262,95 @@ const App = () => {
 
                     {(dialogueLoading || dialogue) && (
                       <div className="mt-8 pt-8 border-t border-slate-100">
-                        <div className="text-xs text-indigo-500 font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
-                          <Sparkles className="w-3.5 h-3.5" />
-                          실전 회화 (Context Dialogue)
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="text-xs text-indigo-500 font-bold uppercase tracking-wider flex items-center gap-2">
+                            <Sparkles className="w-3.5 h-3.5" />
+                            실전 회화 (Context Dialogue)
+                          </div>
+                          {dialogue?.turns?.length > 0 && (
+                            <button
+                              onClick={handlePlayFullDialogue}
+                              disabled={isPlayingFullDialogue}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                                isPlayingFullDialogue
+                                  ? 'bg-indigo-100 text-indigo-400 cursor-not-allowed'
+                                  : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm active:scale-95'
+                              }`}
+                            >
+                              {isPlayingFullDialogue ? (
+                                <>
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  재생 중...
+                                </>
+                              ) : (
+                                <>
+                                  <Volume2 className="w-3 h-3" />
+                                  전체 대화 듣기
+                                </>
+                              )}
+                            </button>
+                          )}
                         </div>
                         
                         {dialogueLoading ? (
-                          <div className="flex flex-col items-center py-10 text-slate-400 gap-3">
+                          <div className="flex flex-col items-center py-10 text-slate-400 gap-3 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
                             <Loader2 className="w-8 h-8 animate-spin" />
                             <p className="text-sm font-medium">실전 회화 생성 중...</p>
                           </div>
                         ) : dialogue?.turns?.length > 0 ? (
-                          <div className="space-y-3">
-                            {dialogue.turns.map((t: any, i: number) => (
-                              <div
-                                key={i}
-                                className={`p-4 rounded-2xl border ${
-                                  t.speaker === 'A' ? 'bg-indigo-50/50 border-indigo-100' : 'bg-slate-50 border-slate-100'
-                                }`}
-                              >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <div className="text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">Speaker {t.speaker || '?'}</div>
-                                    <div className="text-sm font-bold text-slate-800 leading-snug">{t.en}</div>
-                                    {t.ko && <div className="text-xs text-slate-500 mt-1.5 font-medium">{t.ko}</div>}
+                          <div className="space-y-4">
+                            {dialogue.turns.map((t: any, i: number) => {
+                              const isA = t.speaker === 'A';
+                              const isCurrent = currentDialogueIndex === i;
+                              return (
+                                <div
+                                  key={i}
+                                  className={`flex w-full ${isA ? 'justify-start' : 'justify-end'} animate-fade-in-up`}
+                                >
+                                  <div className={`relative max-w-[85%] group`}>
+                                    <div className={`mb-1 flex items-center gap-2 ${isA ? 'flex-row' : 'flex-row-reverse'}`}>
+                                      <span className={`text-[9px] font-black uppercase tracking-widest ${isA ? 'text-indigo-400' : 'text-violet-400'}`}>
+                                        Speaker {t.speaker}
+                                      </span>
+                                    </div>
+                                    
+                                    <div className={`p-4 rounded-2xl border transition-all ${
+                                      isCurrent 
+                                        ? 'ring-2 ring-indigo-500 shadow-md border-transparent' 
+                                        : 'shadow-sm border-slate-100'
+                                    } ${
+                                      isA 
+                                        ? 'bg-white rounded-tl-none border-slate-200' 
+                                        : 'bg-indigo-50/40 rounded-tr-none border-indigo-100'
+                                    }`}>
+                                      <div className={`flex items-start gap-3 ${isA ? 'flex-row' : 'flex-row-reverse'}`}>
+                                        <div className={`flex-1 min-w-0 ${isA ? 'text-left' : 'text-right'}`}>
+                                          <div className="text-sm font-bold text-slate-800 leading-snug mb-1">
+                                            {t.en}
+                                          </div>
+                                          {t.ko && (
+                                            <div className="text-xs text-slate-500 font-medium break-keep">
+                                              {t.ko}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <button
+                                          onClick={() => speak(t.en, isA ? 'WOMAN' : 'MAN')}
+                                          className={`shrink-0 p-1.5 rounded-lg transition-all ${
+                                            isSpeaking && speakingText === t.en
+                                              ? 'bg-indigo-600 text-white'
+                                              : 'text-slate-300 hover:text-indigo-600 hover:bg-white'
+                                          }`}
+                                          title="Listen"
+                                        >
+                                          <Volume2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <button
-                                    onClick={() => speak(t.en)}
-                                    className={`shrink-0 p-2 rounded-xl transition-all ${
-                                      isSpeaking && speakingText === t.en
-                                        ? 'bg-indigo-600 text-white shadow-md'
-                                        : 'text-slate-400 hover:text-indigo-600 hover:bg-white'
-                                    }`}
-                                    title="Listen"
-                                  >
-                                    <Volume2 className="w-4 h-4" />
-                                  </button>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         ) : null}
                       </div>

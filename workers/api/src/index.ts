@@ -10,6 +10,7 @@ type QuizRequest = {
 
 type TtsRequest = {
   text: string;
+  voice?: string;
 };
 
 type TopicRequest = {
@@ -36,6 +37,8 @@ type Env = {
   GEMINI_TEXT_MODEL?: string;
   GEMINI_TTS_MODEL?: string;
   GEMINI_TTS_VOICE?: string;
+  GEMINI_TTS_VOICE_WOMAN?: string;
+  GEMINI_TTS_VOICE_MAN?: string;
 };
 
 function json(data: unknown, init?: ResponseInit) {
@@ -477,7 +480,9 @@ async function handleTts(req: Request, env: Env) {
   if (!body?.text?.trim()) return json({ error: 'text is required' }, { status: 400 });
 
   const model = env.GEMINI_TTS_MODEL || 'gemini-2.0-flash-exp';
-  const voice = env.GEMINI_TTS_VOICE || 'Aoede';
+  let voice = body.voice || env.GEMINI_TTS_VOICE || 'Aoede';
+  if (voice === 'WOMAN') voice = env.GEMINI_TTS_VOICE_WOMAN || 'Aoede';
+  if (voice === 'MAN') voice = env.GEMINI_TTS_VOICE_MAN || 'Charon';
 
   const resp = await geminiGenerateContent(env, model, {
     contents: [{ parts: [{ text: body.text }] }],
