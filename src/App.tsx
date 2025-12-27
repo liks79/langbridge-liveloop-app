@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { BookOpen, Sparkles, GraduationCap, Copy, Check, RotateCcw, Search, Volume2, Globe, Loader2, HelpCircle, CheckCircle2, XCircle, Trophy, History, X, Trash2, Clock, Flame, Bookmark, BookmarkPlus, Calendar } from 'lucide-react';
+import { BookOpen, Sparkles, GraduationCap, Copy, Check, RotateCcw, Search, Volume2, Globe, Loader2, HelpCircle, CheckCircle2, XCircle, Trophy, History, X, Trash2, Clock, Flame, Bookmark, BookmarkPlus, Calendar, RefreshCw } from 'lucide-react';
 import { loadDailyExpression, saveDailyExpression, isDailyExpressionFresh } from './lib/dailyExpressionStore';
 import { loadStreak, bumpStreak } from './lib/streakStore';
 import { loadVocab, addVocab, removeVocab, clearVocab, type VocabItem } from './lib/vocabStore';
@@ -12,6 +12,7 @@ const App = () => {
 
   // Daily Expression (NEW)
   const [dailyExpression, setDailyExpression] = useState<any | null>(() => loadDailyExpression());
+  const [dailyRefreshing, setDailyRefreshing] = useState(false);
 
   // Study Streak (NEW)
   const [streakState, setStreakState] = useState(() => loadStreak());
@@ -78,31 +79,30 @@ const App = () => {
     localStorage.setItem('english-live-loop-history', JSON.stringify(history));
   }, [history]);
 
+  const handleRefreshDailyExpression = async () => {
+    if (dailyRefreshing) return;
+    setDailyRefreshing(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/daily-expression`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      const data = await response.json();
+      setDailyExpression(data);
+      saveDailyExpression(data);
+    } catch (err) {
+      console.error('Failed to refresh daily expression:', err);
+    } finally {
+      setDailyRefreshing(false);
+    }
+  };
+
   // Daily Expression: load once per day (cached)
   useEffect(() => {
     if (isDailyExpressionFresh(dailyExpression)) return;
-    let cancelled = false;
-    fetch(`${API_BASE}/api/daily-expression`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((data) => {
-        if (cancelled) return;
-        setDailyExpression(data);
-        try {
-          saveDailyExpression(data);
-        } catch {
-          // ignore
-        }
-      })
-      .catch(() => {
-        // ignore (keep app usable even if daily expression fails)
-      });
-    return () => {
-      cancelled = true;
-    };
+    handleRefreshDailyExpression();
   }, [API_BASE, dailyExpression]);
 
   // 1. 언어 자동 감지 로직
@@ -865,7 +865,7 @@ const App = () => {
                 )}
               </div>
 
-              <div className="pt-2">
+              <div className="pt-2 flex flex-wrap gap-3">
                 <button
                   onClick={() => {
                     const expr = String(dailyExpression.expression || '').trim();
@@ -874,15 +874,29 @@ const App = () => {
                     // Trigger analysis using the explicit text (avoids state timing issues).
                     void handleAnalyze(0, expr);
                   }}
-                  disabled={loading}
+                  disabled={loading || dailyRefreshing}
                   className={`inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-sm shadow-lg transition-all ${
-                    loading
+                    loading || dailyRefreshing
                       ? 'bg-white/20 text-white/40 cursor-not-allowed'
                       : 'bg-white/20 text-white border border-white/10 hover:bg-white/30 active:scale-[0.98]'
                   }`}
                   title="이 표현을 입력창에 넣고 바로 분석합니다"
                 >
                   이 표현 학습하기
+                </button>
+
+                <button
+                  onClick={handleRefreshDailyExpression}
+                  disabled={loading || dailyRefreshing}
+                  className={`inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-sm shadow-lg transition-all ${
+                    loading || dailyRefreshing
+                      ? 'bg-white/20 text-white/40 cursor-not-allowed'
+                      : 'bg-white/20 text-white border border-white/10 hover:bg-white/30 active:scale-[0.98]'
+                  }`}
+                  title="새로운 표현을 불러옵니다"
+                >
+                  <RefreshCw className={`w-4 h-4 ${dailyRefreshing ? 'animate-spin' : ''}`} />
+                  새로운 표현 가져오기
                 </button>
               </div>
             </div>
