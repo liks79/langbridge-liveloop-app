@@ -144,3 +144,20 @@
   opacity: 1;
   animation: lb-topic-shimmer 0.9s ease-out;
 }
+
+/* Skeleton Loading Animation */
+@keyframes lb-skeleton-pulse {
+  0% {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+  50% {
+    background-color: rgba(255, 255, 255, 0.15);
+  }
+  100% {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+}
+
+.lb-skeleton {
+  animation: lb-skeleton-pulse 1.8s ease-in-out infinite;
+}

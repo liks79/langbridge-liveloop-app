@@ -841,7 +841,21 @@ const App = () => {
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
 
         {/* Daily Expression (NEW) */}
-        {dailyExpression?.expression && (
+        {!dailyExpression && dailyRefreshing ? (
+          <div className="relative bg-gradient-to-br from-indigo-600 to-violet-500 rounded-3xl p-8 text-white shadow-xl overflow-hidden">
+            <div className="relative z-10 space-y-6">
+              <div className="w-24 h-3 lb-skeleton rounded opacity-50" />
+              <div className="space-y-3">
+                <div className="w-full max-w-[300px] h-10 lb-skeleton rounded" />
+                <div className="w-48 h-6 lb-skeleton rounded opacity-70" />
+              </div>
+              <div className="pt-2 flex gap-3">
+                <div className="w-32 h-10 lb-skeleton rounded opacity-40" />
+                <div className="w-32 h-10 lb-skeleton rounded opacity-40" />
+              </div>
+            </div>
+          </div>
+        ) : dailyExpression?.expression ? (
           <div className="relative bg-gradient-to-br from-indigo-600 to-violet-500 rounded-3xl p-8 text-white shadow-xl overflow-hidden group">
             {/* Faint stylized background icon */}
             <div className="absolute right-[-20px] top-[-20px] opacity-10 transform rotate-12 transition-transform duration-700 group-hover:rotate-6 group-hover:scale-110">
@@ -901,7 +915,7 @@ const App = () => {
               </div>
             </div>
           </div>
-        )}
+        ) : null}
         
         {/* Input Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden transition-all duration-300">
