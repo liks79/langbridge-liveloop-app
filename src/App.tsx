@@ -283,8 +283,9 @@ const App = () => {
     }
   };
 
-  const handleAnalyze = async (retryCount = 0) => {
-    if (!inputText.trim()) return;
+  const handleAnalyze = async (retryCount = 0, textOverride?: string) => {
+    const textToAnalyze = (textOverride ?? inputText).trim();
+    if (!textToAnalyze) return;
     setLoading(true);
     setError('');
     if (retryCount === 0) {
@@ -295,12 +296,13 @@ const App = () => {
     }
 
     try {
+      const computedMode: 'EtoK' | 'KtoE' = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(textToAnalyze) ? 'KtoE' : 'EtoK';
       const response = await fetch(`${API_BASE}/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          inputText,
-          detectedMode,
+          inputText: textToAnalyze,
+          detectedMode: computedMode,
         }),
       });
 
@@ -308,7 +310,7 @@ const App = () => {
       if (response.status === 429 && retryCount < 2) {
         const waitTime = Math.pow(2, retryCount) * 1000;
         await new Promise(resolve => setTimeout(resolve, waitTime));
-        return handleAnalyze(retryCount + 1);
+        return handleAnalyze(retryCount + 1, textToAnalyze);
       }
 
       if (!response.ok) throw new Error(`AI 응답 실패: ${response.status}`);
@@ -321,8 +323,8 @@ const App = () => {
       // 히스토리 추가 (최신 100개 유지)
       const newItem = {
         id: Date.now(),
-        text: inputText,
-        mode: detectedMode,
+        text: textToAnalyze,
+        mode: computedMode,
         result: parsedContent,
         timestamp: new Date().toLocaleString()
       };
@@ -863,6 +865,27 @@ const App = () => {
               {dailyExpression.meaningKo && (
                 <div className="text-sm text-slate-600 break-keep">{dailyExpression.meaningKo}</div>
               )}
+              <div className="pt-2">
+                <button
+                  onClick={() => {
+                    const expr = String(dailyExpression.expression || '').trim();
+                    if (!expr) return;
+                    setInputText(expr);
+                    // Trigger analysis using the explicit text (avoids state timing issues).
+                    void handleAnalyze(0, expr);
+                  }}
+                  disabled={loading}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl font-extrabold text-sm shadow-sm transition-all ${
+                    loading
+                      ? 'bg-white/60 text-slate-400 border border-slate-200 cursor-not-allowed'
+                      : 'bg-white text-indigo-700 border border-white/30 hover:bg-white/90 active:scale-[0.99]'
+                  }`}
+                  title="이 표현을 입력창에 넣고 바로 분석합니다"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  이 표현 학습하기
+                </button>
+              </div>
               {dailyExpression.exampleEn && (
                 <div className="mt-2 p-3 rounded-xl bg-slate-50 border border-slate-100">
                   <div className="text-sm font-semibold text-slate-800 italic">"{dailyExpression.exampleEn}"</div>
