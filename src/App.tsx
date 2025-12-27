@@ -99,9 +99,12 @@ const App = () => {
           body: JSON.stringify({ text: cleanedText, voice }),
         });
 
-        // 429 오류 처리: 지수 백오프(Exponential Backoff) 재시도
+        // 429 오류 처리: 지수 백오프(Exponential Backoff) 재시도 + 지터(Jitter) 추가
         if (response.status === 429 && retryCount < 2) {
-          const waitTime = Math.pow(2, retryCount) * 1000;
+          // 기본 대기 시간: 1s, 2s
+          // 지터 추가: 랜덤 0~500ms 추가하여 요청 분산
+          const jitter = Math.floor(Math.random() * 500);
+          const waitTime = Math.pow(2, retryCount) * 1000 + jitter;
           await new Promise((resolve) => setTimeout(resolve, waitTime));
           return getAudioUrl(cleanedText, voice, retryCount + 1);
         }
@@ -463,24 +466,28 @@ const App = () => {
       const parsed = await response.json();
       setDialogue(parsed);
       
-      // Start pre-fetching audio for all turns
+      // Start pre-fetching audio for all turns sequentially to avoid 429 errors
       if (parsed?.turns?.length > 0) {
         setDialogueAudioLoadedCount(0);
-        let count = 0;
-        // Map to keep track of uniquely loaded indices to avoid double counting if turns are duplicated
-        const loadedIndices = new Set();
         
-        parsed.turns.forEach(async (t: any, idx: number) => {
-          try {
-            await getAudioUrl(t.en, t.speaker === 'Liz' ? 'WOMAN' : 'MAN');
-          } finally {
-            if (!loadedIndices.has(idx)) {
-              loadedIndices.add(idx);
+        // Use a separate async function to avoid blocking the main thread
+        const prefetchAudio = async () => {
+          let count = 0;
+          for (const t of parsed.turns) {
+            try {
+              // Add a small delay between requests to be gentle on the API
+              await new Promise(r => setTimeout(r, 200));
+              await getAudioUrl(t.en, t.speaker === 'Liz' ? 'WOMAN' : 'MAN');
+            } catch (e) {
+              console.warn('Dialogue prefetch failed for turn:', t.en, e);
+            } finally {
               count++;
               setDialogueAudioLoadedCount(count);
             }
           }
-        });
+        };
+        
+        void prefetchAudio();
       }
     } catch (err) {
       console.error(err);
