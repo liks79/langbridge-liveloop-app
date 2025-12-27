@@ -280,16 +280,16 @@ function buildDialoguePrompt(text: string) {
   const cleaned = text.trim();
   return `
 You are an expert English tutor for Korean students.
-Create a short, realistic A/B dialogue that demonstrates how the given text could be used in real life.
+Create a short, realistic dialogue between two people, Liz (female) and David (male), that demonstrates how the given text could be used in real life.
 
 Input text:
 ${cleaned}
 
 Constraints:
 - Output must be strictly JSON (no markdown).
-- Create 6 to 10 turns total (A/B alternating).
+- Create 6 to 10 turns total (Liz and David alternating).
 - Each turn must include:
-  - speaker: "A" or "B"
+  - speaker: "Liz" or "David"
   - en: natural English line
   - ko: Korean translation of that line
 - Keep tone friendly and practical. Avoid sensitive/political/explicit content.
@@ -297,7 +297,7 @@ Constraints:
 Return strictly JSON:
 {
   "turns": [
-    { "speaker": "A", "en": "...", "ko": "..." }
+    { "speaker": "Liz", "en": "...", "ko": "..." }
   ]
 }
 `.trim();

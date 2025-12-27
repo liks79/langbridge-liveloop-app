@@ -476,7 +476,7 @@ const App = () => {
       for (let i = 0; i < dialogue.turns.length; i++) {
         setCurrentDialogueIndex(i);
         const turn = dialogue.turns[i];
-        const voice = turn.speaker === 'A' ? 'WOMAN' : 'MAN';
+        const voice = turn.speaker === 'Liz' ? 'WOMAN' : 'MAN';
         await speak(turn.en, voice);
         // Brief pause between speakers
         await new Promise((r) => setTimeout(r, 600));
@@ -1169,17 +1169,17 @@ const App = () => {
                         ) : dialogue?.turns?.length > 0 ? (
                           <div className="space-y-4">
                             {dialogue.turns.map((t: any, i: number) => {
-                              const isA = t.speaker === 'A';
+                              const isLiz = t.speaker === 'Liz';
                               const isCurrent = currentDialogueIndex === i;
                               return (
                                 <div
                                   key={i}
-                                  className={`flex w-full ${isA ? 'justify-start' : 'justify-end'} animate-fade-in-up`}
+                                  className={`flex w-full ${isLiz ? 'justify-start' : 'justify-end'} animate-fade-in-up`}
                                 >
                                   <div className={`relative max-w-[85%] group`}>
-                                    <div className={`mb-1 flex items-center gap-2 ${isA ? 'flex-row' : 'flex-row-reverse'}`}>
-                                      <span className={`text-[9px] font-black uppercase tracking-widest ${isA ? 'text-indigo-400' : 'text-violet-400'}`}>
-                                        {isA ? 'Liz' : 'David'}
+                                    <div className={`mb-1 flex items-center gap-2 ${isLiz ? 'flex-row' : 'flex-row-reverse'}`}>
+                                      <span className={`text-[9px] font-black uppercase tracking-widest ${isLiz ? 'text-indigo-400' : 'text-violet-400'}`}>
+                                        {t.speaker}
                                       </span>
                                     </div>
                                     
@@ -1188,12 +1188,12 @@ const App = () => {
                                         ? 'ring-2 ring-indigo-500 shadow-md border-transparent' 
                                         : 'shadow-sm border-slate-100'
                                     } ${
-                                      isA 
+                                      isLiz 
                                         ? 'bg-white rounded-tl-none border-slate-200' 
                                         : 'bg-indigo-50/40 rounded-tr-none border-indigo-100'
                                     }`}>
-                                      <div className={`flex items-start gap-3 ${isA ? 'flex-row' : 'flex-row-reverse'}`}>
-                                        <div className={`flex-1 min-w-0 ${isA ? 'text-left' : 'text-right'}`}>
+                                      <div className={`flex items-start gap-3 ${isLiz ? 'flex-row' : 'flex-row-reverse'}`}>
+                                        <div className={`flex-1 min-w-0 ${isLiz ? 'text-left' : 'text-right'}`}>
                                           <div className="text-sm font-bold text-slate-800 leading-snug mb-1">
                                             {t.en}
                                           </div>
@@ -1204,7 +1204,7 @@ const App = () => {
                                           )}
                                         </div>
                                         <button
-                                          onClick={() => speak(t.en, isA ? 'WOMAN' : 'MAN')}
+                                          onClick={() => speak(t.en, isLiz ? 'WOMAN' : 'MAN')}
                                           className={`shrink-0 p-1.5 rounded-lg transition-all ${
                                             isSpeaking && speakingText === t.en
                                               ? 'bg-indigo-600 text-white'
@@ -1300,17 +1300,17 @@ const App = () => {
                         ) : dialogue?.turns?.length > 0 ? (
                           <div className="space-y-4">
                             {dialogue.turns.map((t: any, i: number) => {
-                              const isA = t.speaker === 'A';
+                              const isLiz = t.speaker === 'Liz';
                               const isCurrent = currentDialogueIndex === i;
                               return (
                                 <div
                                   key={i}
-                                  className={`flex w-full ${isA ? 'justify-start' : 'justify-end'} animate-fade-in-up`}
+                                  className={`flex w-full ${isLiz ? 'justify-start' : 'justify-end'} animate-fade-in-up`}
                                 >
                                   <div className={`relative max-w-[85%] group`}>
-                                    <div className={`mb-1 flex items-center gap-2 ${isA ? 'flex-row' : 'flex-row-reverse'}`}>
-                                      <span className={`text-[9px] font-black uppercase tracking-widest ${isA ? 'text-indigo-400' : 'text-violet-400'}`}>
-                                        {isA ? 'Liz' : 'David'}
+                                    <div className={`mb-1 flex items-center gap-2 ${isLiz ? 'flex-row' : 'flex-row-reverse'}`}>
+                                      <span className={`text-[9px] font-black uppercase tracking-widest ${isLiz ? 'text-indigo-400' : 'text-violet-400'}`}>
+                                        {t.speaker}
                                       </span>
                                     </div>
                                     
@@ -1319,12 +1319,12 @@ const App = () => {
                                         ? 'ring-2 ring-indigo-500 shadow-md border-transparent' 
                                         : 'shadow-sm border-slate-100'
                                     } ${
-                                      isA 
+                                      isLiz 
                                         ? 'bg-white rounded-tl-none border-slate-200' 
                                         : 'bg-indigo-50/40 rounded-tr-none border-indigo-100'
                                     }`}>
-                                      <div className={`flex items-start gap-3 ${isA ? 'flex-row' : 'flex-row-reverse'}`}>
-                                        <div className={`flex-1 min-w-0 ${isA ? 'text-left' : 'text-right'}`}>
+                                      <div className={`flex items-start gap-3 ${isLiz ? 'flex-row' : 'flex-row-reverse'}`}>
+                                        <div className={`flex-1 min-w-0 ${isLiz ? 'text-left' : 'text-right'}`}>
                                           <div className="text-sm font-bold text-slate-800 leading-snug mb-1">
                                             {t.en}
                                           </div>
@@ -1335,7 +1335,7 @@ const App = () => {
                                           )}
                                         </div>
                                         <button
-                                          onClick={() => speak(t.en, isA ? 'WOMAN' : 'MAN')}
+                                          onClick={() => speak(t.en, isLiz ? 'WOMAN' : 'MAN')}
                                           className={`shrink-0 p-1.5 rounded-lg transition-all ${
                                             isSpeaking && speakingText === t.en
                                               ? 'bg-indigo-600 text-white'
