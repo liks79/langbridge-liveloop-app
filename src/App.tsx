@@ -101,10 +101,10 @@ const App = () => {
       await ttsQueueRef.current;
 
       try {
-        // 강제 Cooldown: 이전 요청으로부터 최소 2초 대기
+        // 강제 Cooldown: 이전 요청으로부터 최소 1초 대기
         const now = Date.now();
         const timeSinceLast = now - lastTtsTimestamp.current;
-        const minWait = 2000; 
+        const minWait = 1000; 
         if (timeSinceLast < minWait) {
           await new Promise(r => setTimeout(r, minWait - timeSinceLast));
         }
@@ -117,10 +117,10 @@ const App = () => {
 
         lastTtsTimestamp.current = Date.now();
 
-        // 429 오류 처리: 긴급 정지 모드 (10초 대기)
+        // 429 오류 처리: 긴급 정지 모드 (5초 대기)
         if (response.status === 429) {
-          console.warn('TTS Rate Limit (429) hit. Entering Panic Mode (10s delay).');
-          await new Promise(r => setTimeout(r, 10000));
+          console.warn('TTS Rate Limit (429) hit. Entering Panic Mode (5s delay).');
+          await new Promise(r => setTimeout(r, 5000));
           
           if (retryCount < 2) {
             return getAudioUrl(cleanedText, voice, retryCount + 1);
@@ -1220,7 +1220,7 @@ const App = () => {
                                 ) : !isDialogueAudioReady ? (
                                   <>
                                     <Clock className="w-3 h-3 animate-pulse" />
-                                    준비 중...
+                                    💬 준비 중...
                                   </>
                                 ) : (
                                   <>
