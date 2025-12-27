@@ -1166,7 +1166,7 @@ const App = () => {
                           {dialogue?.turns?.length > 0 && (
                             <div className="flex items-center gap-3">
                               {!isDialogueAudioReady && (
-                                <div className="flex items-center gap-2 bg-slate-100/50 px-2 py-1 rounded-lg border border-slate-100">
+                                <div className="flex items-center gap-2 bg-white/50 px-2 py-1 rounded-lg border border-slate-100">
                                   <div className="w-12 h-1 bg-slate-200 rounded-full overflow-hidden">
                                     <div 
                                       className="h-full bg-indigo-400 transition-all duration-500 ease-out" 
@@ -1206,67 +1206,69 @@ const App = () => {
                           )}
                         </div>
                         
-                        {dialogueLoading ? (
-                          <div className="flex flex-col items-center py-10 text-slate-400 gap-3 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-                            <Loader2 className="w-8 h-8 animate-spin" />
-                            <p className="text-sm font-medium">실전 회화 생성 중...</p>
-                          </div>
-                        ) : dialogue?.turns?.length > 0 ? (
-                          <div className="space-y-4">
-                            {dialogue.turns.map((t: any, i: number) => {
-                              const isLiz = t.speaker === 'Liz';
-                              const isCurrent = currentDialogueIndex === i;
-                              return (
-                                <div
-                                  key={i}
-                                  className={`flex w-full ${isLiz ? 'justify-start' : 'justify-end'} animate-fade-in-up`}
-                                >
-                                  <div className={`relative max-w-[85%] group`}>
-                                    <div className={`mb-1 flex items-center gap-2 ${isLiz ? 'flex-row' : 'flex-row-reverse'}`}>
-                                      <span className={`text-[9px] font-black uppercase tracking-widest ${isLiz ? 'text-indigo-400' : 'text-violet-400'}`}>
-                                        {t.speaker}
-                                      </span>
-                                    </div>
-                                    
-                                    <div className={`p-4 rounded-2xl border transition-all ${
-                                      isCurrent 
-                                        ? 'ring-2 ring-indigo-500 shadow-md border-transparent' 
-                                        : 'shadow-sm border-slate-100'
-                                    } ${
-                                      isLiz 
-                                        ? 'bg-white rounded-tl-none border-slate-200' 
-                                        : 'bg-indigo-50/40 rounded-tr-none border-indigo-100'
-                                    }`}>
-                                      <div className={`flex items-start gap-3 ${isLiz ? 'flex-row' : 'flex-row-reverse'}`}>
-                                        <div className={`flex-1 min-w-0 ${isLiz ? 'text-left' : 'text-right'}`}>
-                                          <div className="text-sm font-bold text-slate-800 leading-snug mb-1">
-                                            {t.en}
-                                          </div>
-                                          {t.ko && (
-                                            <div className="text-xs text-slate-500 font-medium break-keep">
-                                              {t.ko}
+                        <div className="bg-indigo-50/30 p-6 rounded-3xl border border-indigo-100/50">
+                          {dialogueLoading ? (
+                            <div className="flex flex-col items-center py-10 text-slate-400 gap-3">
+                              <Loader2 className="w-8 h-8 animate-spin" />
+                              <p className="text-sm font-medium">실전 회화 생성 중...</p>
+                            </div>
+                          ) : dialogue?.turns?.length > 0 ? (
+                            <div className="space-y-4">
+                              {dialogue.turns.map((t: any, i: number) => {
+                                const isLiz = t.speaker === 'Liz';
+                                const isCurrent = currentDialogueIndex === i;
+                                return (
+                                  <div
+                                    key={i}
+                                    className={`flex w-full ${isLiz ? 'justify-start' : 'justify-end'} animate-fade-in-up`}
+                                  >
+                                    <div className={`relative max-w-[85%] group`}>
+                                      <div className={`mb-1 flex items-center gap-2 ${isLiz ? 'flex-row' : 'flex-row-reverse'}`}>
+                                        <span className={`text-[9px] font-black uppercase tracking-widest ${isLiz ? 'text-indigo-400' : 'text-violet-400'}`}>
+                                          {t.speaker}
+                                        </span>
+                                      </div>
+                                      
+                                      <div className={`p-4 rounded-2xl border transition-all ${
+                                        isCurrent 
+                                          ? 'ring-2 ring-indigo-500 shadow-md border-transparent bg-white' 
+                                          : 'shadow-sm border-slate-100'
+                                      } ${
+                                        isLiz 
+                                          ? 'bg-white rounded-tl-none border-slate-200' 
+                                          : 'bg-white/60 rounded-tr-none border-indigo-100'
+                                      }`}>
+                                        <div className={`flex items-start gap-3 ${isLiz ? 'flex-row' : 'flex-row-reverse'}`}>
+                                          <div className={`flex-1 min-w-0 ${isLiz ? 'text-left' : 'text-right'}`}>
+                                            <div className="text-sm font-bold text-slate-800 leading-snug mb-1">
+                                              {t.en}
                                             </div>
-                                          )}
+                                            {t.ko && (
+                                              <div className="text-xs text-slate-500 font-medium break-keep">
+                                                {t.ko}
+                                              </div>
+                                            )}
+                                          </div>
+                                          <button
+                                            onClick={() => speak(t.en, isLiz ? 'WOMAN' : 'MAN')}
+                                            className={`shrink-0 p-1.5 rounded-lg transition-all ${
+                                              isSpeaking && speakingText === t.en
+                                                ? 'bg-indigo-600 text-white'
+                                                : 'text-slate-300 hover:text-indigo-600 hover:bg-white border border-transparent hover:border-indigo-100'
+                                            }`}
+                                            title="Listen"
+                                          >
+                                            <Volume2 className="w-4 h-4" />
+                                          </button>
                                         </div>
-                                        <button
-                                          onClick={() => speak(t.en, isLiz ? 'WOMAN' : 'MAN')}
-                                          className={`shrink-0 p-1.5 rounded-lg transition-all ${
-                                            isSpeaking && speakingText === t.en
-                                              ? 'bg-indigo-600 text-white'
-                                              : 'text-slate-300 hover:text-indigo-600 hover:bg-white'
-                                          }`}
-                                          title="Listen"
-                                        >
-                                          <Volume2 className="w-4 h-4" />
-                                        </button>
                                       </div>
                                     </div>
                                   </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : null}
+                                );
+                              })}
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
                     )}
                   </>
@@ -1315,7 +1317,7 @@ const App = () => {
                           {dialogue?.turns?.length > 0 && (
                             <div className="flex items-center gap-3">
                               {!isDialogueAudioReady && (
-                                <div className="flex items-center gap-2 bg-slate-100/50 px-2 py-1 rounded-lg border border-slate-100">
+                                <div className="flex items-center gap-2 bg-white/50 px-2 py-1 rounded-lg border border-slate-100">
                                   <div className="w-12 h-1 bg-slate-200 rounded-full overflow-hidden">
                                     <div 
                                       className="h-full bg-indigo-400 transition-all duration-500 ease-out" 
@@ -1355,67 +1357,69 @@ const App = () => {
                           )}
                         </div>
                         
-                        {dialogueLoading ? (
-                          <div className="flex flex-col items-center py-10 text-slate-400 gap-3 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-                            <Loader2 className="w-8 h-8 animate-spin" />
-                            <p className="text-sm font-medium">실전 회화 생성 중...</p>
-                          </div>
-                        ) : dialogue?.turns?.length > 0 ? (
-                          <div className="space-y-4">
-                            {dialogue.turns.map((t: any, i: number) => {
-                              const isLiz = t.speaker === 'Liz';
-                              const isCurrent = currentDialogueIndex === i;
-                              return (
-                                <div
-                                  key={i}
-                                  className={`flex w-full ${isLiz ? 'justify-start' : 'justify-end'} animate-fade-in-up`}
-                                >
-                                  <div className={`relative max-w-[85%] group`}>
-                                    <div className={`mb-1 flex items-center gap-2 ${isLiz ? 'flex-row' : 'flex-row-reverse'}`}>
-                                      <span className={`text-[9px] font-black uppercase tracking-widest ${isLiz ? 'text-indigo-400' : 'text-violet-400'}`}>
-                                        {t.speaker}
-                                      </span>
-                                    </div>
-                                    
-                                    <div className={`p-4 rounded-2xl border transition-all ${
-                                      isCurrent 
-                                        ? 'ring-2 ring-indigo-500 shadow-md border-transparent' 
-                                        : 'shadow-sm border-slate-100'
-                                    } ${
-                                      isLiz 
-                                        ? 'bg-white rounded-tl-none border-slate-200' 
-                                        : 'bg-indigo-50/40 rounded-tr-none border-indigo-100'
-                                    }`}>
-                                      <div className={`flex items-start gap-3 ${isLiz ? 'flex-row' : 'flex-row-reverse'}`}>
-                                        <div className={`flex-1 min-w-0 ${isLiz ? 'text-left' : 'text-right'}`}>
-                                          <div className="text-sm font-bold text-slate-800 leading-snug mb-1">
-                                            {t.en}
-                                          </div>
-                                          {t.ko && (
-                                            <div className="text-xs text-slate-500 font-medium break-keep">
-                                              {t.ko}
+                        <div className="bg-indigo-50/30 p-6 rounded-3xl border border-indigo-100/50">
+                          {dialogueLoading ? (
+                            <div className="flex flex-col items-center py-10 text-slate-400 gap-3">
+                              <Loader2 className="w-8 h-8 animate-spin" />
+                              <p className="text-sm font-medium">실전 회화 생성 중...</p>
+                            </div>
+                          ) : dialogue?.turns?.length > 0 ? (
+                            <div className="space-y-4">
+                              {dialogue.turns.map((t: any, i: number) => {
+                                const isLiz = t.speaker === 'Liz';
+                                const isCurrent = currentDialogueIndex === i;
+                                return (
+                                  <div
+                                    key={i}
+                                    className={`flex w-full ${isLiz ? 'justify-start' : 'justify-end'} animate-fade-in-up`}
+                                  >
+                                    <div className={`relative max-w-[85%] group`}>
+                                      <div className={`mb-1 flex items-center gap-2 ${isLiz ? 'flex-row' : 'flex-row-reverse'}`}>
+                                        <span className={`text-[9px] font-black uppercase tracking-widest ${isLiz ? 'text-indigo-400' : 'text-violet-400'}`}>
+                                          {t.speaker}
+                                        </span>
+                                      </div>
+                                      
+                                      <div className={`p-4 rounded-2xl border transition-all ${
+                                        isCurrent 
+                                          ? 'ring-2 ring-indigo-500 shadow-md border-transparent bg-white' 
+                                          : 'shadow-sm border-slate-100'
+                                      } ${
+                                        isLiz 
+                                          ? 'bg-white rounded-tl-none border-slate-200' 
+                                          : 'bg-white/60 rounded-tr-none border-indigo-100'
+                                      }`}>
+                                        <div className={`flex items-start gap-3 ${isLiz ? 'flex-row' : 'flex-row-reverse'}`}>
+                                          <div className={`flex-1 min-w-0 ${isLiz ? 'text-left' : 'text-right'}`}>
+                                            <div className="text-sm font-bold text-slate-800 leading-snug mb-1">
+                                              {t.en}
                                             </div>
-                                          )}
+                                            {t.ko && (
+                                              <div className="text-xs text-slate-500 font-medium break-keep">
+                                                {t.ko}
+                                              </div>
+                                            )}
+                                          </div>
+                                          <button
+                                            onClick={() => speak(t.en, isLiz ? 'WOMAN' : 'MAN')}
+                                            className={`shrink-0 p-1.5 rounded-lg transition-all ${
+                                              isSpeaking && speakingText === t.en
+                                                ? 'bg-indigo-600 text-white'
+                                                : 'text-slate-300 hover:text-indigo-600 hover:bg-white border border-transparent hover:border-indigo-100'
+                                            }`}
+                                            title="Listen"
+                                          >
+                                            <Volume2 className="w-4 h-4" />
+                                          </button>
                                         </div>
-                                        <button
-                                          onClick={() => speak(t.en, isLiz ? 'WOMAN' : 'MAN')}
-                                          className={`shrink-0 p-1.5 rounded-lg transition-all ${
-                                            isSpeaking && speakingText === t.en
-                                              ? 'bg-indigo-600 text-white'
-                                              : 'text-slate-300 hover:text-indigo-600 hover:bg-white'
-                                          }`}
-                                          title="Listen"
-                                        >
-                                          <Volume2 className="w-4 h-4" />
-                                        </button>
                                       </div>
                                     </div>
                                   </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : null}
+                                );
+                              })}
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
                     )}
                   </>
