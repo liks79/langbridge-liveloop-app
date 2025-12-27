@@ -16,6 +16,21 @@ type TopicRequest = {
   keyword?: string;
 };
 
+type DailyExpressionRequest = {
+  /**
+   * Optional override for testing/debug. If omitted, server uses today's date.
+   * Format: YYYY-MM-DD
+   */
+  date?: string;
+};
+
+type DialogueRequest = {
+  /**
+   * A short text to base the dialogue on. Can be a sentence or short paragraph.
+   */
+  text: string;
+};
+
 type Env = {
   GEMINI_API_KEY: string;
   GEMINI_TEXT_MODEL?: string;
@@ -235,6 +250,56 @@ Return strictly JSON:
 `.trim();
 }
 
+function buildDailyExpressionPrompt(params: { todayISO: string; weekdayName: string }) {
+  return `
+You are an expert English tutor for Korean students.
+Create ONE "Daily Expression" that native speakers commonly use.
+
+Constraints:
+- Output must be strictly JSON (no markdown).
+- Provide an idiom or useful expression, plus a short Korean explanation and a natural example sentence.
+- Keep it concise and safe for all audiences.
+
+Return strictly JSON:
+{
+  "expression": "Idiom or useful phrase",
+  "meaningKo": "Korean meaning/explanation (1-2 sentences)",
+  "exampleEn": "Natural example sentence in English",
+  "exampleKo": "Korean translation of the example"
+}
+
+Today's date: ${params.todayISO}
+Weekday: ${params.weekdayName}
+`.trim();
+}
+
+function buildDialoguePrompt(text: string) {
+  const cleaned = text.trim();
+  return `
+You are an expert English tutor for Korean students.
+Create a short, realistic A/B dialogue that demonstrates how the given text could be used in real life.
+
+Input text:
+${cleaned}
+
+Constraints:
+- Output must be strictly JSON (no markdown).
+- Create 6 to 10 turns total (A/B alternating).
+- Each turn must include:
+  - speaker: "A" or "B"
+  - en: natural English line
+  - ko: Korean translation of that line
+- Keep tone friendly and practical. Avoid sensitive/political/explicit content.
+
+Return strictly JSON:
+{
+  "turns": [
+    { "speaker": "A", "en": "...", "ko": "..." }
+  ]
+}
+`.trim();
+}
+
 async function handleAnalyze(req: Request, env: Env) {
   const body = (await req.json()) as AnalyzeRequest;
   if (!body?.inputText?.trim()) return json({ error: 'inputText is required' }, { status: 400 });
@@ -300,6 +365,77 @@ async function handleTopic(req: Request, env: Env) {
     const text = typeof parsed?.text === 'string' ? parsed.text : '';
     if (!text.trim()) return json({ error: 'Invalid topic payload', raw }, { status: 502 });
     return json({ text });
+  } catch {
+    return json({ error: 'Invalid JSON from Gemini', raw }, { status: 502 });
+  }
+}
+
+async function handleDailyExpression(req: Request, env: Env) {
+  const body = (await req.json().catch(() => ({}))) as DailyExpressionRequest;
+  const now = new Date();
+  const todayISO = typeof body?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.date) ? body.date : now.toISOString().slice(0, 10);
+  const weekdayName = now.toLocaleString('en-US', { weekday: 'long' });
+
+  const model = env.GEMINI_TEXT_MODEL || 'gemini-1.5-flash-latest';
+  const systemPrompt = buildDailyExpressionPrompt({ todayISO, weekdayName });
+
+  const resp = await geminiGenerateContent(env, model, {
+    contents: [{ parts: [{ text: 'Generate a daily expression.' }] }],
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    generationConfig: { responseMimeType: 'application/json' },
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    return json({ error: 'Gemini error', status: resp.status, detail: text }, { status: resp.status });
+  }
+
+  const data: any = await resp.json();
+  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) return json({ error: 'No content from Gemini' }, { status: 502 });
+
+  try {
+    const parsed = JSON.parse(raw);
+    const expression = typeof parsed?.expression === 'string' ? parsed.expression : '';
+    const meaningKo = typeof parsed?.meaningKo === 'string' ? parsed.meaningKo : '';
+    const exampleEn = typeof parsed?.exampleEn === 'string' ? parsed.exampleEn : '';
+    const exampleKo = typeof parsed?.exampleKo === 'string' ? parsed.exampleKo : '';
+
+    if (!expression.trim() || !exampleEn.trim()) return json({ error: 'Invalid daily expression payload', raw }, { status: 502 });
+    return json({ expression, meaningKo, exampleEn, exampleKo, date: todayISO });
+  } catch {
+    return json({ error: 'Invalid JSON from Gemini', raw }, { status: 502 });
+  }
+}
+
+async function handleDialogue(req: Request, env: Env) {
+  const body = (await req.json().catch(() => ({}))) as DialogueRequest;
+  const text = typeof body?.text === 'string' ? body.text : '';
+  if (!text.trim()) return json({ error: 'text is required' }, { status: 400 });
+
+  const model = env.GEMINI_TEXT_MODEL || 'gemini-1.5-flash-latest';
+  const systemPrompt = buildDialoguePrompt(text);
+
+  const resp = await geminiGenerateContent(env, model, {
+    contents: [{ parts: [{ text: 'Generate a short dialogue.' }] }],
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    generationConfig: { responseMimeType: 'application/json' },
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    return json({ error: 'Gemini error', status: resp.status, detail: text }, { status: resp.status });
+  }
+
+  const data: any = await resp.json();
+  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) return json({ error: 'No content from Gemini' }, { status: 502 });
+
+  try {
+    const parsed = JSON.parse(raw);
+    const turns = Array.isArray(parsed?.turns) ? parsed.turns : null;
+    if (!turns || turns.length < 2) return json({ error: 'Invalid dialogue payload', raw }, { status: 502 });
+    return json({ turns });
   } catch {
     return json({ error: 'Invalid JSON from Gemini', raw }, { status: 502 });
   }
@@ -402,6 +538,8 @@ export default {
       else if (req.method === 'POST' && url.pathname === '/api/quiz') res = await handleQuiz(req, env);
       else if (req.method === 'POST' && url.pathname === '/api/tts') res = await handleTts(req, env);
       else if (req.method === 'POST' && url.pathname === '/api/topic') res = await handleTopic(req, env);
+      else if (req.method === 'POST' && url.pathname === '/api/daily-expression') res = await handleDailyExpression(req, env);
+      else if (req.method === 'POST' && url.pathname === '/api/dialogue') res = await handleDialogue(req, env);
       else res = json({ error: 'Not found' }, { status: 404 });
 
       return withCors(req, res);
