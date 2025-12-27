@@ -70,6 +70,53 @@ const App = () => {
 
   // 현재 진행 중인 API 요청 추적 (중복 방지용)
   const inFlightRequests = useRef<Map<string, Promise<string>>>(new Map());
+
+  // 오디오 URL 가져오기 (Worker `/api/tts` 사용)
+  const getAudioUrl = async (text: string, retryCount = 0): Promise<string> => {
+    const cleanedText = text.trim();
+    if (!cleanedText) return '';
+
+    // 1. 캐시 확인
+    if (audioCache.current.has(cleanedText)) {
+      return audioCache.current.get(cleanedText)!;
+    }
+
+    // 2. 이미 동일한 텍스트로 요청이 진행 중인지 확인
+    if (inFlightRequests.current.has(cleanedText)) {
+      return inFlightRequests.current.get(cleanedText)!;
+    }
+
+    const fetchPromise = (async () => {
+      try {
+        const response = await fetch(`${API_BASE}/api/tts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: cleanedText }),
+        });
+
+        // 429 오류 처리: 지수 백오프(Exponential Backoff) 재시도
+        if (response.status === 429 && retryCount < 2) {
+          const waitTime = Math.pow(2, retryCount) * 1000;
+          await new Promise((resolve) => setTimeout(resolve, waitTime));
+          return getAudioUrl(cleanedText, retryCount + 1);
+        }
+
+        if (!response.ok) throw new Error('TTS API Error: ' + response.status);
+
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        audioCache.current.set(cleanedText, audioUrl);
+        return audioUrl;
+      } finally {
+        // 요청이 끝나면 목록에서 제거
+        inFlightRequests.current.delete(cleanedText);
+      }
+    })();
+
+    // 진행 중인 요청 목록에 등록
+    inFlightRequests.current.set(cleanedText, fetchPromise);
+    return fetchPromise;
+  };
   // NOTE:
   // - Gemini API 호출은 브라우저에서 직접 하지 않고, 같은 도메인의 Worker(`/api/*`)로만 호출합니다.
   // - API Key는 Worker의 Cloudflare Secret로만 보관되어 브라우저/레포에 노출되지 않습니다.
@@ -92,6 +139,11 @@ const App = () => {
       const data = await response.json();
       setDailyExpression(data);
       saveDailyExpression(data);
+
+      // Pre-fetch TTS for the daily expression
+      if (data?.expression) {
+        void getAudioUrl(data.expression).catch(() => {});
+      }
     } catch (err) {
       console.error('Failed to refresh daily expression:', err);
     } finally {
@@ -101,7 +153,13 @@ const App = () => {
 
   // Daily Expression: load once per day (cached)
   useEffect(() => {
-    if (isDailyExpressionFresh(dailyExpression)) return;
+    if (isDailyExpressionFresh(dailyExpression)) {
+      // Even if fresh from cache, pre-fetch if expression exists
+      if (dailyExpression?.expression) {
+        void getAudioUrl(dailyExpression.expression).catch(() => {});
+      }
+      return;
+    }
     handleRefreshDailyExpression();
   }, [API_BASE, dailyExpression]);
 
@@ -114,50 +172,6 @@ const App = () => {
     const hasKorean = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(inputText);
     setDetectedMode(hasKorean ? 'KtoE' : 'EtoK');
   }, [inputText]);
-
-  // 오디오 URL 가져오기 (Worker `/api/tts` 사용)
-  const getAudioUrl = async (text: string, retryCount = 0): Promise<string> => {
-    // 1. 캐시 확인
-    if (audioCache.current.has(text)) {
-      return audioCache.current.get(text)!;
-    }
-
-    // 2. 이미 동일한 텍스트로 요청이 진행 중인지 확인
-    if (inFlightRequests.current.has(text)) {
-      return inFlightRequests.current.get(text)!;
-    }
-
-    const fetchPromise = (async () => {
-      try {
-        const response = await fetch(`${API_BASE}/api/tts`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text }),
-        });
-
-        // 429 오류 처리: 지수 백오프(Exponential Backoff) 재시도
-        if (response.status === 429 && retryCount < 2) {
-          const waitTime = Math.pow(2, retryCount) * 1000;
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-          return getAudioUrl(text, retryCount + 1);
-        }
-
-        if (!response.ok) throw new Error('TTS API Error: ' + response.status);
-
-        const audioBlob = await response.blob();
-        const audioUrl = URL.createObjectURL(audioBlob);
-        audioCache.current.set(text, audioUrl);
-        return audioUrl;
-      } finally {
-        // 요청이 끝나면 목록에서 제거
-        inFlightRequests.current.delete(text);
-      }
-    })();
-
-    // 진행 중인 요청 목록에 등록
-    inFlightRequests.current.set(text, fetchPromise);
-    return fetchPromise;
-  };
 
   // TTS 재생 함수
   const speak = async (text: string) => {
@@ -261,6 +275,8 @@ const App = () => {
       if (!text.trim()) throw new Error('Empty topic');
 
       setInputText(text);
+      // Pre-fetch TTS for the generated topic (it's English)
+      void getAudioUrl(text).catch(() => {});
       // Count this as a study action (generating study text).
       setStreakState(bumpStreak());
       window.setTimeout(() => {
@@ -314,6 +330,16 @@ const App = () => {
       setResult(parsedContent);
       // Count successful analysis as a study day.
       setStreakState(bumpStreak());
+
+      // Pre-fetch TTS if input is English (fire and forget)
+      if (computedMode === 'EtoK') {
+        void getAudioUrl(textToAnalyze).catch(() => {});
+      } else if (computedMode === 'KtoE' && parsedContent?.variations) {
+        // Pre-fetch result variations if input was Korean
+        parsedContent.variations.forEach((v: any) => {
+          if (v.text) void getAudioUrl(v.text).catch(() => {});
+        });
+      }
 
       // 히스토리 추가 (최신 100개 유지)
       const newItem = {
