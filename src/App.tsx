@@ -44,6 +44,7 @@ const App = () => {
   const [dialogueLoading, setDialogueLoading] = useState(false);
   const [currentDialogueIndex, setCurrentDialogueIndex] = useState<number | null>(null);
   const [isPlayingFullDialogue, setIsPlayingFullDialogue] = useState(false);
+  const [dialogueAudioLoadedCount, setDialogueAudioLoadedCount] = useState(0);
 
   // History States (NEW)
   const [history, setHistory] = useState<any[]>(() => {
@@ -461,6 +462,26 @@ const App = () => {
       if (!response.ok) throw new Error('Dialogue 생성 실패');
       const parsed = await response.json();
       setDialogue(parsed);
+      
+      // Start pre-fetching audio for all turns
+      if (parsed?.turns?.length > 0) {
+        setDialogueAudioLoadedCount(0);
+        let count = 0;
+        // Map to keep track of uniquely loaded indices to avoid double counting if turns are duplicated
+        const loadedIndices = new Set();
+        
+        parsed.turns.forEach(async (t: any, idx: number) => {
+          try {
+            await getAudioUrl(t.en, t.speaker === 'Liz' ? 'WOMAN' : 'MAN');
+          } finally {
+            if (!loadedIndices.has(idx)) {
+              loadedIndices.add(idx);
+              count++;
+              setDialogueAudioLoadedCount(count);
+            }
+          }
+        });
+      }
     } catch (err) {
       console.error(err);
       // Don't show global error for dialogue, just log it.
@@ -701,6 +722,12 @@ const App = () => {
       </div>
     );
   };
+
+  const totalDialogueTurns = dialogue?.turns?.length || 0;
+  const isDialogueAudioReady = dialogueAudioLoadedCount >= totalDialogueTurns && totalDialogueTurns > 0;
+  const dialogueLoadingProgress = totalDialogueTurns > 0 
+    ? Math.round((dialogueAudioLoadedCount / totalDialogueTurns) * 100) 
+    : 0;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 relative">
@@ -1137,27 +1164,45 @@ const App = () => {
                             실전 회화 (Context Dialogue)
                           </div>
                           {dialogue?.turns?.length > 0 && (
-                            <button
-                              onClick={handlePlayFullDialogue}
-                              disabled={isPlayingFullDialogue}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
-                                isPlayingFullDialogue
-                                  ? 'bg-indigo-100 text-indigo-400 cursor-not-allowed'
-                                  : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm active:scale-95'
-                              }`}
-                            >
-                              {isPlayingFullDialogue ? (
-                                <>
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                  재생 중...
-                                </>
-                              ) : (
-                                <>
-                                  <Volume2 className="w-3 h-3" />
-                                  전체 대화 듣기
-                                </>
+                            <div className="flex items-center gap-3">
+                              {!isDialogueAudioReady && (
+                                <div className="flex items-center gap-2 bg-slate-100/50 px-2 py-1 rounded-lg border border-slate-100">
+                                  <div className="w-12 h-1 bg-slate-200 rounded-full overflow-hidden">
+                                    <div 
+                                      className="h-full bg-indigo-400 transition-all duration-500 ease-out" 
+                                      style={{ width: `${dialogueLoadingProgress}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-[9px] font-black text-indigo-400 tabular-nums">{dialogueLoadingProgress}%</span>
+                                </div>
                               )}
-                            </button>
+                              <button
+                                onClick={handlePlayFullDialogue}
+                                disabled={isPlayingFullDialogue || !isDialogueAudioReady}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                                  isPlayingFullDialogue || !isDialogueAudioReady
+                                    ? 'bg-indigo-50 text-indigo-300 cursor-not-allowed border border-indigo-100'
+                                    : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm active:scale-95'
+                                }`}
+                              >
+                                {isPlayingFullDialogue ? (
+                                  <>
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                    재생 중...
+                                  </>
+                                ) : !isDialogueAudioReady ? (
+                                  <>
+                                    <Clock className="w-3 h-3 animate-pulse" />
+                                    준비 중...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Volume2 className="w-3 h-3" />
+                                    전체 대화 듣기
+                                  </>
+                                )}
+                              </button>
+                            </div>
                           )}
                         </div>
                         
@@ -1268,27 +1313,45 @@ const App = () => {
                             실전 회화 (Context Dialogue)
                           </div>
                           {dialogue?.turns?.length > 0 && (
-                            <button
-                              onClick={handlePlayFullDialogue}
-                              disabled={isPlayingFullDialogue}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
-                                isPlayingFullDialogue
-                                  ? 'bg-indigo-100 text-indigo-400 cursor-not-allowed'
-                                  : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm active:scale-95'
-                              }`}
-                            >
-                              {isPlayingFullDialogue ? (
-                                <>
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                  재생 중...
-                                </>
-                              ) : (
-                                <>
-                                  <Volume2 className="w-3 h-3" />
-                                  전체 대화 듣기
-                                </>
+                            <div className="flex items-center gap-3">
+                              {!isDialogueAudioReady && (
+                                <div className="flex items-center gap-2 bg-slate-100/50 px-2 py-1 rounded-lg border border-slate-100">
+                                  <div className="w-12 h-1 bg-slate-200 rounded-full overflow-hidden">
+                                    <div 
+                                      className="h-full bg-indigo-400 transition-all duration-500 ease-out" 
+                                      style={{ width: `${dialogueLoadingProgress}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-[9px] font-black text-indigo-400 tabular-nums">{dialogueLoadingProgress}%</span>
+                                </div>
                               )}
-                            </button>
+                              <button
+                                onClick={handlePlayFullDialogue}
+                                disabled={isPlayingFullDialogue || !isDialogueAudioReady}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                                  isPlayingFullDialogue || !isDialogueAudioReady
+                                    ? 'bg-indigo-50 text-indigo-300 cursor-not-allowed border border-indigo-100'
+                                    : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm active:scale-95'
+                                }`}
+                              >
+                                {isPlayingFullDialogue ? (
+                                  <>
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                    재생 중...
+                                  </>
+                                ) : !isDialogueAudioReady ? (
+                                  <>
+                                    <Clock className="w-3 h-3 animate-pulse" />
+                                    준비 중...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Volume2 className="w-3 h-3" />
+                                    전체 대화 듣기
+                                  </>
+                                )}
+                              </button>
+                            </div>
                           )}
                         </div>
                         
