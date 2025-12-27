@@ -825,26 +825,6 @@ const App = () => {
                 </span>
               )}
             </button>
-            <div className="hidden sm:flex items-center gap-1 bg-white border border-slate-200 rounded-full p-1 text-xs font-bold">
-              <button
-                onClick={() => setTtsRate(0.75)}
-                className={`px-2 py-1 rounded-full transition-colors ${
-                  ttsRate === 0.75 ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'
-                }`}
-                title="Shadowing speed 0.75x"
-              >
-                0.75x
-              </button>
-              <button
-                onClick={() => setTtsRate(1.0)}
-                className={`px-2 py-1 rounded-full transition-colors ${
-                  ttsRate === 1.0 ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'
-                }`}
-                title="Shadowing speed 1.0x"
-              >
-                1.0x
-              </button>
-            </div>
             <div className="flex items-center gap-2 text-xs font-bold text-orange-700 bg-orange-50 border border-orange-100 px-3 py-1 rounded-full">
               <Flame className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Streak</span>
@@ -1055,9 +1035,31 @@ const App = () => {
                   <GraduationCap className="w-5 h-5" />
                   <h2 className="font-bold">학습 결과</h2>
                 </div>
-                <div className="text-xs text-indigo-200 bg-indigo-700/50 px-2 py-1 rounded flex items-center gap-1">
-                   <Volume2 className="w-3 h-3" />
-                   단어를 클릭하여 네이티브 발음 듣기
+                <div className="flex items-center gap-2">
+                  <div className="text-xs text-indigo-200 bg-indigo-700/50 px-2 py-1 rounded flex items-center gap-1">
+                     <Volume2 className="w-3 h-3" />
+                     단어를 클릭하여 네이티브 발음 듣기
+                  </div>
+                  <div className="flex items-center gap-1 bg-indigo-700/30 rounded-lg p-0.5 text-[10px] font-bold">
+                    <button
+                      onClick={() => setTtsRate(0.75)}
+                      className={`px-1.5 py-0.5 rounded transition-colors ${
+                        ttsRate === 0.75 ? 'bg-white text-indigo-700' : 'text-indigo-100 hover:bg-white/10'
+                      }`}
+                      title="Shadowing speed 0.75x"
+                    >
+                      0.75x
+                    </button>
+                    <button
+                      onClick={() => setTtsRate(1.0)}
+                      className={`px-1.5 py-0.5 rounded transition-colors ${
+                        ttsRate === 1.0 ? 'bg-white text-indigo-700' : 'text-indigo-100 hover:bg-white/10'
+                      }`}
+                      title="Shadowing speed 1.0x"
+                    >
+                      1.0x
+                    </button>
+                  </div>
                 </div>
               </div>
               
