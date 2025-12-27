@@ -487,28 +487,9 @@ const App = () => {
       const parsed = await response.json();
       setDialogue(parsed);
       
-      // Start pre-fetching audio for all turns sequentially to avoid 429 errors
-      if (parsed?.turns?.length > 0) {
-        setDialogueAudioLoadedCount(0);
-        
-        // Use a separate async function to avoid blocking the main thread
-        const prefetchAudio = async () => {
-          let count = 0;
-          for (const t of parsed.turns) {
-            try {
-              // The global ttsQueue will handle the 2s cooldown and pacing
-              await getAudioUrl(t.en, t.speaker === 'Liz' ? 'WOMAN' : 'MAN');
-            } catch (e) {
-              console.warn('Dialogue prefetch failed for turn:', t.en, e);
-            } finally {
-              count++;
-              setDialogueAudioLoadedCount(count);
-            }
-          }
-        };
-        
-        void prefetchAudio();
-      }
+      // [수정] 대화가 생성되어도 음성을 즉시 사전 로딩(prefetch)하지 않습니다.
+      // 대신 "전체 대화 듣기" 클릭 시점에 순차적으로 로딩 및 재생합니다.
+      setDialogueAudioLoadedCount(0);
     } catch (err) {
       console.error(err);
       // Don't show global error for dialogue, just log it.
@@ -750,10 +731,8 @@ const App = () => {
     );
   };
 
-  const totalDialogueTurns = dialogue?.turns?.length || 0;
-  const isDialogueAudioReady = dialogueAudioLoadedCount >= totalDialogueTurns && totalDialogueTurns > 0;
-  const dialogueLoadingProgress = totalDialogueTurns > 0 
-    ? Math.round((dialogueAudioLoadedCount / totalDialogueTurns) * 100) 
+  const dialogueLoadingProgress = dialogue?.turns?.length > 0 
+    ? Math.round((dialogueAudioLoadedCount / dialogue.turns.length) * 100) 
     : 0;
 
   return (
@@ -1192,7 +1171,7 @@ const App = () => {
                           </div>
                           {dialogue?.turns?.length > 0 && (
                             <div className="flex items-center gap-3">
-                              {!isDialogueAudioReady && (
+                              {isPlayingFullDialogue && (
                                 <div className="flex items-center gap-2 bg-white/50 px-2 py-1 rounded-lg border border-slate-100">
                                   <div className="w-12 h-1 bg-slate-200 rounded-full overflow-hidden">
                                     <div 
@@ -1205,9 +1184,9 @@ const App = () => {
                               )}
                               <button
                                 onClick={handlePlayFullDialogue}
-                                disabled={isPlayingFullDialogue || !isDialogueAudioReady}
+                                disabled={isPlayingFullDialogue}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
-                                  isPlayingFullDialogue || !isDialogueAudioReady
+                                  isPlayingFullDialogue
                                     ? 'bg-indigo-50 text-indigo-300 cursor-not-allowed border border-indigo-100'
                                     : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm active:scale-95'
                                 }`}
@@ -1216,11 +1195,6 @@ const App = () => {
                                   <>
                                     <Loader2 className="w-3 h-3 animate-spin" />
                                     재생 중...
-                                  </>
-                                ) : !isDialogueAudioReady ? (
-                                  <>
-                                    <Clock className="w-3 h-3 animate-pulse" />
-                                    💬 준비 중...
                                   </>
                                 ) : (
                                   <>
@@ -1343,7 +1317,7 @@ const App = () => {
                           </div>
                           {dialogue?.turns?.length > 0 && (
                             <div className="flex items-center gap-3">
-                              {!isDialogueAudioReady && (
+                              {isPlayingFullDialogue && (
                                 <div className="flex items-center gap-2 bg-white/50 px-2 py-1 rounded-lg border border-slate-100">
                                   <div className="w-12 h-1 bg-slate-200 rounded-full overflow-hidden">
                                     <div 
@@ -1356,9 +1330,9 @@ const App = () => {
                               )}
                               <button
                                 onClick={handlePlayFullDialogue}
-                                disabled={isPlayingFullDialogue || !isDialogueAudioReady}
+                                disabled={isPlayingFullDialogue}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
-                                  isPlayingFullDialogue || !isDialogueAudioReady
+                                  isPlayingFullDialogue
                                     ? 'bg-indigo-50 text-indigo-300 cursor-not-allowed border border-indigo-100'
                                     : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm active:scale-95'
                                 }`}
@@ -1367,11 +1341,6 @@ const App = () => {
                                   <>
                                     <Loader2 className="w-3 h-3 animate-spin" />
                                     재생 중...
-                                  </>
-                                ) : !isDialogueAudioReady ? (
-                                  <>
-                                    <Clock className="w-3 h-3 animate-pulse" />
-                                    준비 중...
                                   </>
                                 ) : (
                                   <>
