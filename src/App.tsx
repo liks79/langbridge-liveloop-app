@@ -1179,7 +1179,7 @@ const App = () => {
                                   <div className={`relative max-w-[85%] group`}>
                                     <div className={`mb-1 flex items-center gap-2 ${isA ? 'flex-row' : 'flex-row-reverse'}`}>
                                       <span className={`text-[9px] font-black uppercase tracking-widest ${isA ? 'text-indigo-400' : 'text-violet-400'}`}>
-                                        Speaker {t.speaker}
+                                        {isA ? 'Liz' : 'David'}
                                       </span>
                                     </div>
                                     
@@ -1310,7 +1310,7 @@ const App = () => {
                                   <div className={`relative max-w-[85%] group`}>
                                     <div className={`mb-1 flex items-center gap-2 ${isA ? 'flex-row' : 'flex-row-reverse'}`}>
                                       <span className={`text-[9px] font-black uppercase tracking-widest ${isA ? 'text-indigo-400' : 'text-violet-400'}`}>
-                                        Speaker {t.speaker}
+                                        {isA ? 'Liz' : 'David'}
                                       </span>
                                     </div>
                                     
