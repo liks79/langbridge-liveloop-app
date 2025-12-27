@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { BookOpen, Sparkles, GraduationCap, Copy, Check, RotateCcw, Search, Volume2, Globe, Loader2, HelpCircle, CheckCircle2, XCircle, Trophy, History, X, Trash2, Clock, Flame, Bookmark, BookmarkPlus } from 'lucide-react';
+import { BookOpen, Sparkles, GraduationCap, Copy, Check, RotateCcw, Search, Volume2, Globe, Loader2, HelpCircle, CheckCircle2, XCircle, Trophy, History, X, Trash2, Clock, Flame, Bookmark, BookmarkPlus, Calendar } from 'lucide-react';
 import { loadDailyExpression, saveDailyExpression, isDailyExpressionFresh } from './lib/dailyExpressionStore';
 import { loadStreak, bumpStreak } from './lib/streakStore';
 import { loadVocab, addVocab, removeVocab, clearVocab, type VocabItem } from './lib/vocabStore';
@@ -12,7 +12,6 @@ const App = () => {
 
   // Daily Expression (NEW)
   const [dailyExpression, setDailyExpression] = useState<any | null>(() => loadDailyExpression());
-  const [dailyLoading, setDailyLoading] = useState(false);
 
   // Study Streak (NEW)
   const [streakState, setStreakState] = useState(() => loadStreak());
@@ -83,7 +82,6 @@ const App = () => {
   useEffect(() => {
     if (isDailyExpressionFresh(dailyExpression)) return;
     let cancelled = false;
-    setDailyLoading(true);
     fetch(`${API_BASE}/api/daily-expression`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -101,9 +99,6 @@ const App = () => {
       })
       .catch(() => {
         // ignore (keep app usable even if daily expression fails)
-      })
-      .finally(() => {
-        if (!cancelled) setDailyLoading(false);
       });
     return () => {
       cancelled = true;
@@ -847,24 +842,29 @@ const App = () => {
 
         {/* Daily Expression (NEW) */}
         {dailyExpression?.expression && (
-          <div className="bg-white rounded-2xl border border-indigo-100 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2 font-bold">
-                <Sparkles className="w-4 h-4" />
-                오늘의 표현
-              </div>
-              {dailyLoading && (
-                <div className="text-xs text-white/80 flex items-center gap-2">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  불러오는 중...
-                </div>
-              )}
+          <div className="relative bg-gradient-to-br from-indigo-600 to-violet-500 rounded-3xl p-8 text-white shadow-xl overflow-hidden group">
+            {/* Faint stylized background icon */}
+            <div className="absolute right-[-20px] top-[-20px] opacity-10 transform rotate-12 transition-transform duration-700 group-hover:rotate-6 group-hover:scale-110">
+              <Calendar size={200} strokeWidth={1.5} />
             </div>
-            <div className="p-4 space-y-2">
-              <div className="text-lg font-extrabold text-slate-900">{dailyExpression.expression}</div>
-              {dailyExpression.meaningKo && (
-                <div className="text-sm text-slate-600 break-keep">{dailyExpression.meaningKo}</div>
-              )}
+
+            <div className="relative z-10 space-y-6">
+              <div className="flex items-center gap-2 text-indigo-100/80 text-[10px] font-black uppercase tracking-[0.2em]">
+                <Sparkles className="w-3.5 h-3.5" />
+                TODAY'S IDIOM
+              </div>
+
+              <div>
+                <h2 className="text-3xl md:text-4xl font-black leading-tight tracking-tight drop-shadow-sm">
+                  "{dailyExpression.expression}"
+                </h2>
+                {dailyExpression.meaningKo && (
+                  <p className="mt-2 text-indigo-50 font-bold text-lg opacity-90 drop-shadow-sm">
+                    {dailyExpression.meaningKo}
+                  </p>
+                )}
+              </div>
+
               <div className="pt-2">
                 <button
                   onClick={() => {
@@ -875,25 +875,16 @@ const App = () => {
                     void handleAnalyze(0, expr);
                   }}
                   disabled={loading}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl font-extrabold text-sm shadow-sm transition-all ${
+                  className={`inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-sm shadow-lg transition-all ${
                     loading
-                      ? 'bg-white/60 text-slate-400 border border-slate-200 cursor-not-allowed'
-                      : 'bg-white text-indigo-700 border border-white/30 hover:bg-white/90 active:scale-[0.99]'
+                      ? 'bg-white/20 text-white/40 cursor-not-allowed'
+                      : 'bg-white/20 text-white border border-white/10 hover:bg-white/30 active:scale-[0.98]'
                   }`}
                   title="이 표현을 입력창에 넣고 바로 분석합니다"
                 >
-                  <Sparkles className="w-4 h-4" />
                   이 표현 학습하기
                 </button>
               </div>
-              {dailyExpression.exampleEn && (
-                <div className="mt-2 p-3 rounded-xl bg-slate-50 border border-slate-100">
-                  <div className="text-sm font-semibold text-slate-800 italic">"{dailyExpression.exampleEn}"</div>
-                  {dailyExpression.exampleKo && (
-                    <div className="text-xs text-slate-500 mt-1">{dailyExpression.exampleKo}</div>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         )}
