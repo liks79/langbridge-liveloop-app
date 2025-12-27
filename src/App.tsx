@@ -74,6 +74,10 @@ const App = () => {
   // 현재 진행 중인 API 요청 추적 (중복 방지용)
   const inFlightRequests = useRef<Map<string, Promise<string>>>(new Map());
 
+  // 전역 TTS 요청 큐 (Rate Limit 429 방지용)
+  const ttsQueueRef = useRef<Promise<any>>(Promise.resolve());
+  const lastTtsTimestamp = useRef<number>(0);
+
   // 오디오 URL 가져오기 (Worker `/api/tts` 사용)
   const getAudioUrl = async (text: string, voice?: string, retryCount = 0): Promise<string> => {
     const cleanedText = text.trim();
@@ -91,22 +95,37 @@ const App = () => {
       return inFlightRequests.current.get(cacheKey)!;
     }
 
-    const fetchPromise = (async () => {
+    // 전역 큐를 사용하여 순차적으로 실행
+    const fetchWithQueue = async (): Promise<string> => {
+      // 큐 대기
+      await ttsQueueRef.current;
+
       try {
+        // 강제 Cooldown: 이전 요청으로부터 최소 2초 대기
+        const now = Date.now();
+        const timeSinceLast = now - lastTtsTimestamp.current;
+        const minWait = 2000; 
+        if (timeSinceLast < minWait) {
+          await new Promise(r => setTimeout(r, minWait - timeSinceLast));
+        }
+
         const response = await fetch(`${API_BASE}/api/tts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: cleanedText, voice }),
         });
 
-        // 429 오류 처리: 지수 백오프(Exponential Backoff) 재시도 + 지터(Jitter) 추가
-        if (response.status === 429 && retryCount < 2) {
-          // 기본 대기 시간: 1s, 2s
-          // 지터 추가: 랜덤 0~500ms 추가하여 요청 분산
-          const jitter = Math.floor(Math.random() * 500);
-          const waitTime = Math.pow(2, retryCount) * 1000 + jitter;
-          await new Promise((resolve) => setTimeout(resolve, waitTime));
-          return getAudioUrl(cleanedText, voice, retryCount + 1);
+        lastTtsTimestamp.current = Date.now();
+
+        // 429 오류 처리: 긴급 정지 모드 (10초 대기)
+        if (response.status === 429) {
+          console.warn('TTS Rate Limit (429) hit. Entering Panic Mode (10s delay).');
+          await new Promise(r => setTimeout(r, 10000));
+          
+          if (retryCount < 2) {
+            return getAudioUrl(cleanedText, voice, retryCount + 1);
+          }
+          throw new Error('Rate limit exceeded after retries');
         }
 
         if (!response.ok) throw new Error('TTS API Error: ' + response.status);
@@ -116,14 +135,16 @@ const App = () => {
         audioCache.current.set(cacheKey, audioUrl);
         return audioUrl;
       } finally {
-        // 요청이 끝나면 목록에서 제거
         inFlightRequests.current.delete(cacheKey);
       }
-    })();
+    };
 
-    // 진행 중인 요청 목록에 등록
-    inFlightRequests.current.set(cacheKey, fetchPromise);
-    return fetchPromise;
+    // 새로운 요청을 큐에 등록
+    const nextTask = fetchWithQueue();
+    ttsQueueRef.current = nextTask.catch(() => {}); // 오류가 나도 다음 큐는 진행
+    inFlightRequests.current.set(cacheKey, nextTask);
+    
+    return nextTask;
   };
   // NOTE:
   // - Gemini API 호출은 브라우저에서 직접 하지 않고, 같은 도메인의 Worker(`/api/*`)로만 호출합니다.
@@ -475,8 +496,7 @@ const App = () => {
           let count = 0;
           for (const t of parsed.turns) {
             try {
-              // Add a small delay between requests to be gentle on the API
-              await new Promise(r => setTimeout(r, 200));
+              // The global ttsQueue will handle the 2s cooldown and pacing
               await getAudioUrl(t.en, t.speaker === 'Liz' ? 'WOMAN' : 'MAN');
             } catch (e) {
               console.warn('Dialogue prefetch failed for turn:', t.en, e);
