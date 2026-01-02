@@ -966,7 +966,10 @@ const App = () => {
         {!dailyExpression && dailyRefreshing ? (
           <div className="relative bg-gradient-to-br from-indigo-600 to-violet-500 rounded-3xl p-8 text-white shadow-xl overflow-hidden">
             <div className="relative z-10 space-y-6">
-              <div className="w-24 h-3 lb-skeleton rounded opacity-50" />
+              <div className="flex justify-between items-center">
+                <div className="w-24 h-3 lb-skeleton rounded opacity-50" />
+                <div className="w-16 h-4 lb-skeleton rounded opacity-30" />
+              </div>
               <div className="space-y-3">
                 <div className="w-full max-w-[300px] h-10 lb-skeleton rounded" />
                 <div className="w-48 h-6 lb-skeleton rounded opacity-70" />
@@ -985,9 +988,16 @@ const App = () => {
             </div>
 
             <div className="relative z-10 space-y-6">
-              <div className="flex items-center gap-2 text-indigo-100/80 text-[10px] font-black uppercase tracking-[0.2em]">
-                <Sparkles className="w-3.5 h-3.5" />
-                TODAY'S IDIOM
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-indigo-100/80 text-[10px] font-black uppercase tracking-[0.2em]">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  TODAY'S IDIOM
+                </div>
+                {dailyExpression.category && (
+                  <div className="px-2 py-0.5 bg-indigo-900/40 border border-indigo-300/30 rounded-md text-[9px] font-black text-amber-300 uppercase tracking-wider shadow-sm">
+                    {dailyExpression.category}
+                  </div>
+                )}
               </div>
 
               <div>

@@ -137,7 +137,7 @@ Return a JSON object with this structure:
     }
   ]
 }
-Analyze 3-5 key words.
+Analyze 3-6 key words.
 `.trim()
     : `
 You are an expert English writing coach for Korean speakers.
@@ -253,19 +253,23 @@ Return strictly JSON:
 `.trim();
 }
 
-function buildDailyExpressionPrompt(params: { todayISO: string; weekdayName: string }) {
+function buildDailyExpressionPrompt(params: { todayISO: string; weekdayName: string; category: string }) {
   return `
 You are an expert English tutor for Korean students.
 Create ONE "Daily Expression" that native speakers commonly use.
 
+Focus Category: ${params.category}
+
 Constraints:
 - Output must be strictly JSON (no markdown).
-- Provide an idiom or useful expression, plus a short Korean explanation and a natural example sentence.
+- Provide an idiom, phrasal verb, or useful expression, plus a short Korean explanation and a natural example sentence.
+- Choose something that is natural and commonly used by native speakers, but avoid overly cliché idioms (e.g., "Piece of cake", "Break a leg") unless they fit a very specific, fresh context.
+- Prioritize expressions that are practical for intermediate learners.
 - Keep it concise and safe for all audiences.
 
 Return strictly JSON:
 {
-  "expression": "Idiom or useful phrase",
+  "expression": "The expression/idiom",
   "meaningKo": "Korean meaning/explanation (1-2 sentences)",
   "exampleEn": "Natural example sentence in English",
   "exampleKo": "Korean translation of the example"
@@ -273,6 +277,8 @@ Return strictly JSON:
 
 Today's date: ${params.todayISO}
 Weekday: ${params.weekdayName}
+Category: ${params.category}
+Random Seed: ${Math.random()}
 `.trim();
 }
 
@@ -287,7 +293,7 @@ ${cleaned}
 
 Constraints:
 - Output must be strictly JSON (no markdown).
-- Create 6 to 10 turns total (Liz and David alternating).
+- Create 4 to 6 turns total (Liz and David alternating).
 - Each turn must include:
   - speaker: "Liz" or "David"
   - en: natural English line
@@ -379,11 +385,26 @@ async function handleDailyExpression(req: Request, env: Env) {
   const todayISO = typeof body?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.date) ? body.date : now.toISOString().slice(0, 10);
   const weekdayName = now.toLocaleString('en-US', { weekday: 'long' });
 
+  // Diverse categories to ensure variety
+  const CATEGORIES = [
+    'Idioms & Slang',
+    'Phrasal Verbs',
+    'Business English',
+    'Daily Life & Routines',
+    'Emotions & Feelings',
+    'Travel & Exploration',
+    'Socializing & Networking',
+    'Technology & Work',
+    'Health & Wellness',
+    'Opinion & Debate'
+  ];
+  const randomCategory = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
+
   const model = env.GEMINI_TEXT_MODEL || 'gemini-1.5-flash-latest';
-  const systemPrompt = buildDailyExpressionPrompt({ todayISO, weekdayName });
+  const systemPrompt = buildDailyExpressionPrompt({ todayISO, weekdayName, category: randomCategory });
 
   const resp = await geminiGenerateContent(env, model, {
-    contents: [{ parts: [{ text: 'Generate a daily expression.' }] }],
+    contents: [{ parts: [{ text: `Generate a daily expression for category: ${randomCategory}` }] }],
     systemInstruction: { parts: [{ text: systemPrompt }] },
     generationConfig: { responseMimeType: 'application/json' },
   });
@@ -405,7 +426,7 @@ async function handleDailyExpression(req: Request, env: Env) {
     const exampleKo = typeof parsed?.exampleKo === 'string' ? parsed.exampleKo : '';
 
     if (!expression.trim() || !exampleEn.trim()) return json({ error: 'Invalid daily expression payload', raw }, { status: 502 });
-    return json({ expression, meaningKo, exampleEn, exampleKo, date: todayISO });
+    return json({ expression, meaningKo, exampleEn, exampleKo, category: parsed.category || randomCategory, date: todayISO });
   } catch {
     return json({ error: 'Invalid JSON from Gemini', raw }, { status: 502 });
   }
