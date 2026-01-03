@@ -1,11 +1,18 @@
 # Cloudflare (Pages + Workers + Access) 운영 가이드
 
 ## 목표 구조
-- **Cloudflare Pages**: 프론트엔드(정적 자산)
+- **Cloudflare Workers with Assets**: 프론트엔드(정적 자산)와 백엔드(Worker)를 하나의 프로젝트로 통합 배포
 - **Cloudflare Workers**: 같은 도메인에서 `/api/*` 경로를 처리 (Gemini 호출 프록시)
-- **Cloudflare Access(Zero Trust)**: 팀/지인만 접근 가능하도록 사이트 전체(+ `/api/*`) 보호
+- **Cloudflare Access(Zero Trust)**: 팀/지인만 접근 가능하도록 사이트 전체 보호
 
-## 1) Pages 설정
+## 1) 통합 배포 설정 (CI/CD)
+루트 디렉토리에 `wrangler.toml`이 추가되었습니다. 이 파일은 프론트엔드(`dist/`)와 백엔드(`workers/api/src/index.ts`)를 한 번에 배포하도록 설정되어 있습니다.
+
+- **Build command**: `npm run build`
+- **Deploy command**: `npx wrangler versions upload` (또는 Cloudflare Pages 자동 배포 설정)
+
+## 2) Pages 설정 (Legacy)
+만약 기존 Pages 방식을 사용한다면:
 - **Build command**: `npm run build`
 - **Output directory**: `dist`
 
