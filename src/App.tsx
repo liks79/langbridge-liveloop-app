@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { BookOpen, Sparkles, GraduationCap, Copy, Check, RotateCcw, Search, Volume2, Globe, Loader2, HelpCircle, CheckCircle2, XCircle, Trophy, History, X, Trash2, Clock, Flame, Star, Calendar, RefreshCw, WifiOff, AlertCircle } from 'lucide-react';
+import { BookOpen, Sparkles, GraduationCap, Copy, Check, RotateCcw, Search, Volume2, Globe, Loader2, HelpCircle, CheckCircle2, XCircle, Trophy, History, X, Trash2, Clock, Flame, Star, Calendar, RefreshCw, WifiOff } from 'lucide-react';
 import { loadDailyExpression, saveDailyExpression, isDailyExpressionFresh } from './lib/dailyExpressionStore';
 import { loadStreak, bumpStreak } from './lib/streakStore';
 import { loadVocab, addVocab, removeVocab, clearVocab, type VocabItem } from './lib/vocabStore';
