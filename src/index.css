@@ -161,3 +161,34 @@
 .lb-skeleton {
   animation: lb-skeleton-pulse 1.8s ease-in-out infinite;
 }
+
+/* API Connection Error Animations */
+@keyframes lb-error-slide-in {
+  from {
+    transform: translate(-50%, -100%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+@keyframes lb-shake {
+  0%, 100% { transform: translate(-50%, 0); }
+  25% { transform: translate(-52%, 0); }
+  75% { transform: translate(-48%, 0); }
+}
+
+.lb-error-notice {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  animation: lb-error-slide-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.lb-error-notice.shake {
+  animation: lb-shake 0.4s ease-in-out;
+}

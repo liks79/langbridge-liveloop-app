@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { BookOpen, Sparkles, GraduationCap, Copy, Check, RotateCcw, Search, Volume2, Globe, Loader2, HelpCircle, CheckCircle2, XCircle, Trophy, History, X, Trash2, Clock, Flame, Star, Calendar, RefreshCw } from 'lucide-react';
+import { BookOpen, Sparkles, GraduationCap, Copy, Check, RotateCcw, Search, Volume2, Globe, Loader2, HelpCircle, CheckCircle2, XCircle, Trophy, History, X, Trash2, Clock, Flame, Star, Calendar, RefreshCw, WifiOff, AlertCircle } from 'lucide-react';
 import { loadDailyExpression, saveDailyExpression, isDailyExpressionFresh } from './lib/dailyExpressionStore';
 import { loadStreak, bumpStreak } from './lib/streakStore';
 import { loadVocab, addVocab, removeVocab, clearVocab, type VocabItem } from './lib/vocabStore';
@@ -113,6 +113,23 @@ const App = () => {
   const ttsQueueRef = useRef<Promise<any>>(Promise.resolve());
   const lastTtsTimestamp = useRef<number>(0);
 
+  // API 연결 상태 관리
+  const [isConnectionError, setIsConnectionError] = useState(false);
+  const [lastFailedAction, setLastFailedAction] = useState<{ fn: () => void; label: string } | null>(null);
+
+  // 연결 오류 처리 핸들러
+  const handleApiError = (err: any, retryAction: () => void, label: string, silent = false) => {
+    console.error(`API Error [${label}]:`, err);
+    const isNetworkError = err instanceof TypeError || err.message?.toLowerCase().includes('fetch');
+    
+    if (isNetworkError) {
+      setIsConnectionError(true);
+      setLastFailedAction({ fn: retryAction, label });
+    } else if (!silent) {
+      setError(`${label} 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.`);
+    }
+  };
+
   // 오디오 URL 가져오기 (Worker `/api/tts` 사용)
   const getAudioUrl = async (text: string, voice?: string, retryCount = 0): Promise<string> => {
     const cleanedText = text.trim();
@@ -148,6 +165,9 @@ const App = () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: cleanedText, voice }),
+        }).catch(err => {
+          handleApiError(err, () => getAudioUrl(text, voice), '음성 생성', true);
+          throw err;
         });
 
         lastTtsTimestamp.current = Date.now();
@@ -199,7 +219,7 @@ const App = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
-      if (!response.ok) throw new Error(String(response.status));
+      if (!response.ok) throw new Error(`Daily expression refresh failed: ${response.status}`);
       const data = await response.json();
       setDailyExpression(data);
       saveDailyExpression(data);
@@ -209,7 +229,7 @@ const App = () => {
         void getAudioUrl(data.expression).catch(() => {});
       }
     } catch (err) {
-      console.error('Failed to refresh daily expression:', err);
+      handleApiError(err, handleRefreshDailyExpression, '오늘의 표현 갱신');
     } finally {
       setDailyRefreshing(false);
     }
@@ -358,8 +378,7 @@ const App = () => {
         }
       }, 0);
     } catch (err) {
-      setError('토픽을 생성하는 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.');
-      console.error(err);
+      handleApiError(err, handleGenerateTodayTopic, '토픽 생성');
     } finally {
       setTopicLoading(false);
     }
@@ -437,8 +456,7 @@ const App = () => {
       });
 
     } catch (err) {
-      setError('분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
-      console.error(err);
+      handleApiError(err, () => handleAnalyze(retryCount, textOverride), '학습 결과 분석');
     } finally {
       setLoading(false);
     }
@@ -498,8 +516,7 @@ const App = () => {
       setQuizData(parsedQuiz);
 
     } catch (err) {
-      console.error(err);
-      setError('퀴즈를 생성하는 중 문제가 발생했습니다.');
+      handleApiError(err, handleGenerateQuiz, '퀴즈 생성');
     } finally {
       setQuizLoading(false);
     }
@@ -526,8 +543,7 @@ const App = () => {
       // 대신 "전체 대화 듣기" 클릭 시점에 순차적으로 로딩 및 재생합니다.
       setDialogueAudioLoadedCount(0);
     } catch (err) {
-      console.error(err);
-      // Don't show global error for dialogue, just log it.
+      handleApiError(err, () => handleGenerateDialogue(textOverride), '대화 생성', true);
     } finally {
       setDialogueLoading(false);
     }
@@ -901,6 +917,36 @@ const App = () => {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* API Connection Error Notice */}
+      {isConnectionError && (
+        <div className="lb-error-notice px-4 py-3 bg-red-600 text-white rounded-2xl shadow-2xl flex items-center gap-3 min-w-[320px] max-w-[90vw]">
+          <WifiOff className="w-5 h-5 flex-shrink-0" />
+          <div className="flex-1 min-w-0 text-sm">
+            <p className="font-bold">연결에 문제가 발생했습니다</p>
+            <p className="text-red-100 text-xs truncate">네트워크 상태를 확인하고 다시 시도해주세요.</p>
+          </div>
+          <button 
+            onClick={() => {
+              setIsConnectionError(false);
+              // Small delay to allow the state to reset and potentially re-trigger if it fails again
+              setTimeout(() => {
+                lastFailedAction?.fn();
+              }, 100);
+            }}
+            className="bg-white/20 hover:bg-white/30 p-2 rounded-xl transition-colors"
+            title="다시 시도"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          <button 
+            onClick={() => setIsConnectionError(false)}
+            className="p-1 hover:bg-white/10 rounded-lg"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
