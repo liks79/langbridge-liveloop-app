@@ -11,5 +11,11 @@ compatibility_date = "2025-12-25"
 GEMINI_TEXT_MODEL = "gemini-2.5-flash-preview-09-2025"
 GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts"
 GEMINI_TTS_VOICE = "Aoede"
-ALLOWED_ORIGINS = "https://langbridge.liveloop.app"
+GEMINI_TTS_VOICE_WOMAN = "Aoede"
+GEMINI_TTS_VOICE_MAN = "Charon"
+# ALLOWED_ORIGINS = "http://localhost:5173,https://langbridge.example.com"
+
+# ALLOWED_ORIGINS는 보안 및 유연한 관리를 위해 Git에 포함하지 않습니다.
+# 운영(Production) 환경: Cloudflare Dashboard (Settings > Variables)에서 직접 설정하세요.
+# 로컬 개발 환경: .dev.vars 파일에 설정하여 사용하세요.
 
