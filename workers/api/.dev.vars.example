@@ -1,6 +1,9 @@
-GEMINI_API_KEY=your_key_here
+# LangBridge | Local Development Environment Variables
+# Copy this file to .dev.vars and fill in the values.
 
-# [중요] 운영 환경 배포 시 Cloudflare Dashboard에 ALLOWED_ORIGINS를 반드시 등록하세요.
-# 예: https://langbridge.liveloop.app
-# 로컬 개발 시에는 아래 주석을 해제하여 사용하세요.
-# ALLOWED_ORIGINS=http://localhost:5173,https://your-production-domain.com
+# [REQUIRED] Get your API key from https://aistudio.google.com/
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# [OPTIONAL] Allowed origins for CORS (comma-separated)
+# In production, set this in the Cloudflare Dashboard (Settings > Variables).
+# ALLOWED_ORIGINS=http://localhost:5173,https://your-domain.com
