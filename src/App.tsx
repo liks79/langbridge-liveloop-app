@@ -10,14 +10,14 @@ const App = () => {
   // - Preview/dev: set `VITE_API_BASE_URL` (e.g. https://<worker>.workers.dev) to avoid domain mismatch
   const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
-  // Daily Expression (NEW)
+  // Daily Expression
   const [dailyExpression, setDailyExpression] = useState<any | null>(() => loadDailyExpression());
   const [dailyRefreshing, setDailyRefreshing] = useState(false);
 
-  // Study Streak (NEW)
+  // Study Streak
   const [streakState, setStreakState] = useState(() => loadStreak());
 
-  // My Vocabulary (NEW)
+  // My Vocabulary
   const [vocab, setVocab] = useState<VocabItem[]>(() => loadVocab());
   const [showVocab, setShowVocab] = useState(false);
 
@@ -27,7 +27,7 @@ const App = () => {
   const [error, setError] = useState('');
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  // Today Topic (NEW)
+  // Today Topic
   const [topicKeyword, setTopicKeyword] = useState('');
   const [topicLoading, setTopicLoading] = useState(false);
   
@@ -39,7 +39,7 @@ const App = () => {
   const [celebrationKey, setCelebrationKey] = useState(0);
   const [showCelebration, setShowCelebration] = useState(false);
 
-  // Context Dialogue (NEW)
+  // Context Dialogue
   const [dialogue, setDialogue] = useState<any | null>(null);
   const [dialogueLoading, setDialogueLoading] = useState(false);
   const [currentDialogueIndex, setCurrentDialogueIndex] = useState<number | null>(null);
@@ -81,7 +81,7 @@ const App = () => {
     }
   };
 
-  // History States (NEW)
+  // History States
   const [history, setHistory] = useState<any[]>(() => {
     // 초기 로드 시 localStorage에서 히스토리 불러오기
     try {
@@ -539,7 +539,7 @@ const App = () => {
       const parsed = await response.json();
       setDialogue(parsed);
       
-      // [수정] 대화가 생성되어도 음성을 즉시 사전 로딩(prefetch)하지 않습니다.
+      // 대화가 생성되어도 음성을 즉시 사전 로딩(prefetch)하지 않습니다.
       // 대신 "전체 대화 듣기" 클릭 시점에 순차적으로 로딩 및 재생합니다.
       setDialogueAudioLoadedCount(0);
     } catch (err) {
@@ -550,7 +550,7 @@ const App = () => {
   };
 
   const handlePlayFullDialogue = async () => {
-    // [수정] 모든 음성이 준비된 상태에서만 재생 가능하게 합니다.
+    // 모든 음성이 준비된 상태에서만 재생 가능하게 합니다.
     if (!dialogue?.turns?.length || isPlayingFullDialogue || !isDialogueAudioReady) return;
     
     setIsPlayingFullDialogue(true);
@@ -855,7 +855,7 @@ const App = () => {
         </div>
       )}
 
-      {/* Vocabulary Sidebar/Overlay (NEW) */}
+      {/* Vocabulary Sidebar/Overlay */}
       {showVocab && (
         <div className="fixed inset-0 z-50 flex justify-end animate-fade-in">
           <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setShowVocab(false)} />
@@ -1008,7 +1008,7 @@ const App = () => {
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
 
-        {/* Daily Expression (NEW) */}
+        {/* Daily Expression */}
         {!dailyExpression && dailyRefreshing ? (
           <div className="relative bg-gradient-to-br from-indigo-600 to-violet-500 rounded-3xl p-8 text-white shadow-xl overflow-hidden">
             <div className="relative z-10 space-y-6">
@@ -1655,7 +1655,7 @@ const App = () => {
               ))}
             </div>
 
-            {/* Quiz Section (NEW) */}
+            {/* Quiz Section */}
             <div className="mt-8 border-t border-slate-200 pt-8">
               {!quizData && !quizLoading && (
                 <div className="text-center">
