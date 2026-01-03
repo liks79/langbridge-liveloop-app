@@ -39,6 +39,7 @@ type Env = {
   GEMINI_TTS_VOICE?: string;
   GEMINI_TTS_VOICE_WOMAN?: string;
   GEMINI_TTS_VOICE_MAN?: string;
+  ALLOWED_ORIGINS?: string;
 };
 
 function json(data: unknown, init?: ResponseInit) {
@@ -47,11 +48,31 @@ function json(data: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(data), { ...init, headers });
 }
 
-function withCors(req: Request, res: Response) {
-  // Same-domain is the primary goal. Still, keep permissive CORS for local dev.
-  const origin = req.headers.get('Origin') ?? '*';
+function withCors(req: Request, res: Response, env: Env) {
+  const origin = req.headers.get('Origin');
+  const allowedOrigins = (env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+  let activeOrigin = '';
+
+  if (allowedOrigins.length === 0 || allowedOrigins.includes('*')) {
+    // If no restrictions or '*' wildcard is present
+    activeOrigin = origin || '*';
+  } else if (origin && allowedOrigins.includes(origin)) {
+    // If exact match found
+    activeOrigin = origin;
+  }
+
+  // If origin is not allowed (and not an OPTIONS request which might have a different logic or we want to block anyway)
+  // We return a 403 Forbidden for non-OPTIONS requests from unauthorized origins
+  if (allowedOrigins.length > 0 && !allowedOrigins.includes('*') && !activeOrigin && req.method !== 'OPTIONS') {
+    return json({ error: 'Origin not allowed' }, { status: 403 });
+  }
+
   const headers = new Headers(res.headers);
-  headers.set('Access-Control-Allow-Origin', origin);
+  headers.set('Access-Control-Allow-Origin', activeOrigin || '*');
   headers.set('Vary', 'Origin');
   headers.set('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   headers.set('Access-Control-Allow-Headers', 'Content-Type');
@@ -547,15 +568,15 @@ export default {
     const url = new URL(req.url);
 
     if (req.method === 'OPTIONS') {
-      return withCors(req, new Response(null, { status: 204 }));
+      return withCors(req, new Response(null, { status: 204 }), env);
     }
 
     if (!url.pathname.startsWith('/api/')) {
-      return withCors(req, json({ error: 'Not found' }, { status: 404 }));
+      return withCors(req, json({ error: 'Not found' }, { status: 404 }), env);
     }
 
     if (!env.GEMINI_API_KEY) {
-      return withCors(req, json({ error: 'Server misconfigured: GEMINI_API_KEY missing' }, { status: 500 }));
+      return withCors(req, json({ error: 'Server misconfigured: GEMINI_API_KEY missing' }, { status: 500 }), env);
     }
 
     try {
@@ -568,11 +589,12 @@ export default {
       else if (req.method === 'POST' && url.pathname === '/api/dialogue') res = await handleDialogue(req, env);
       else res = json({ error: 'Not found' }, { status: 404 });
 
-      return withCors(req, res);
+      return withCors(req, res, env);
     } catch (e: any) {
       return withCors(
         req,
         json({ error: 'Worker error', detail: e?.message || String(e) }, { status: 500 }),
+        env,
       );
     }
   },
