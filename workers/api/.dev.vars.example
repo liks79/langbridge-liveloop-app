@@ -1,9 +1,6 @@
 GEMINI_API_KEY=your_key_here
 
-# Optional overrides
-GEMINI_TEXT_MODEL=gemini-2.5-flash-preview-09-2025
-GEMINI_TTS_MODEL=gemini-2.5-flash-preview-tts
-GEMINI_TTS_VOICE=Aoede
-GEMINI_TTS_VOICE_WOMAN=Aoede
-GEMINI_TTS_VOICE_MAN=Charon
-ALLOWED_ORIGINS=http://localhost:5173,https://langbridge.example.com
+# [중요] 운영 환경 배포 시 Cloudflare Dashboard에 ALLOWED_ORIGINS를 반드시 등록하세요.
+# 예: https://langbridge.liveloop.app
+# 로컬 개발 시에는 아래 주석을 해제하여 사용하세요.
+# ALLOWED_ORIGINS=http://localhost:5173,https://your-production-domain.com
