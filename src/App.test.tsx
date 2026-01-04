@@ -58,16 +58,25 @@ describe('App Component', () => {
     });
   });
 
-  it('detects language and updates UI labels', () => {
+  it('detects language and updates UI labels', async () => {
     render(<App />);
     const textarea = screen.getByTestId('main-input');
+    
     fireEvent.change(textarea, { target: { value: 'Hello' } });
-    expect(screen.getByText('English Detected')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('English Detected')).toBeInTheDocument();
+    });
+
     fireEvent.change(textarea, { target: { value: '안녕' } });
-    expect(screen.getByText('한국어 감지됨')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('한국어 감지됨')).toBeInTheDocument();
+    });
   });
 
   it('shows error notice when API fails with network error', async () => {
+    // Suppress console.error for expected API failure
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    
     mockFetch.mockImplementation(async (url: string) => {
       if (url.includes('/api/analyze')) {
         throw new TypeError('Failed to fetch');
@@ -86,6 +95,8 @@ describe('App Component', () => {
     await waitFor(() => {
       expect(screen.getByText('연결에 문제가 발생했습니다')).toBeInTheDocument();
     });
+    
+    consoleSpy.mockRestore();
   });
 
   it('generates today topic when clicking the button', async () => {

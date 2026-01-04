@@ -56,6 +56,15 @@ export function createApiClient(apiBase: string) {
     tts(text: string) {
       return postBlob('/api/tts', { text });
     },
+    topic(keyword?: string) {
+      return postJson('/api/topic', { keyword });
+    },
+    dailyExpression() {
+      return postJson('/api/daily-expression', {});
+    },
+    dialogue(text: string) {
+      return postJson('/api/dialogue', { text });
+    },
   };
 }
 
