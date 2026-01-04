@@ -87,7 +87,14 @@ cp workers/api/.dev.vars.example workers/api/.dev.vars
 # .dev.vars 파일을 열고 GEMINI_API_KEY를 입력하세요.
 ```
 
-### 3. 실행
+### 3. 테스트 (Testing)
+프로젝트 로직이 정상 작동하는지 테스트 코드로 검증합니다.
+```bash
+# 전체 테스트 실행
+npm run test:run
+```
+
+### 4. 실행
 ```bash
 # 프론트엔드 실행 (http://localhost:5173)
 npm run dev
