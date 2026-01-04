@@ -1,5 +1,36 @@
 # 💬 LangBridge | LiveLoop.App 🌱
 
+```mermaid
+graph LR
+    subgraph Client ["**1. Client Side (Browser)**"]
+        direction TB
+        FE["**Frontend App**<br/>React 19, Vite, Tailwind 4"]
+        LS[("**LocalStorage**<br/>History, Vocab, Streak")]
+        FE <--> LS
+    end
+
+    subgraph Infrastructure ["**2. Cloudflare Platform**"]
+        direction TB
+        subgraph Pages ["**Cloudflare Pages**"]
+            Assets["Static Assets (dist/)"]
+        end
+        subgraph Workers ["**Cloudflare Workers**"]
+            CORS(["CORS Check"])
+            API["API Proxy (TypeScript)"]
+            CORS --> API
+        end
+    end
+
+    subgraph AI_Engine ["**3. AI Engine (Google Gemini)**"]
+        direction TB
+        G["**Gemini 2.0 API**<br/>Analysis, Quiz, Dialogue, TTS"]
+    end
+
+    FE --- Assets
+    FE --->|"API Call (/api/*)"| CORS
+    API --->|"Secure Proxy (Secret Key)"| G
+```
+
 **LangBridge**는 AI(Gemini 2.0)를 활용하여 영어 학습을 더 스마트하고 즐겁게 만들어주는 모던 웹 애플리케이션입니다. 분석, 퀴즈, 다이얼로그 생성 등 다양한 학습 기능을 통해 네이티브 수준의 영어를 경험하세요.
 
 ![LangBridge Demo](https://via.placeholder.com/800x450?text=LangBridge+Demo+Image)
