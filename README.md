@@ -1,4 +1,4 @@
-# 💬 LangBridge | LiveLoop.App 🌱
+<img width="1322" height="552" alt="image" src="https://github.com/user-attachments/assets/e7d3e8c8-3fc0-437c-9dca-7890176dfcb8" /># 💬 LangBridge | LiveLoop.App 🌱
 
 **LangBridge**는 AI(Gemini 2.0)를 활용하여 영어 학습을 더 스마트하고 즐겁게 만들어주는 모던 웹 애플리케이션입니다. 분석, 퀴즈, 다이얼로그 생성 등 다양한 학습 기능을 통해 네이티브 수준의 영어를 경험하세요.
 
@@ -34,6 +34,7 @@ graph LR
 ```
 ---
 > ✨ **NOTE**: 이 프로젝트는 AI의 도움을 받아 완성되었습니다.
+> DEMO SITE: https://langbridge.liveloop.app/ (AI API 스로틀링 발생으로 사용이 원할하지 않을 수 있습니다.)
 
 ![Demo Screenshot](./src/assets/screenshot.png)
 
