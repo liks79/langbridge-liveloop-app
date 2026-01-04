@@ -58,6 +58,39 @@ describe('apiClient', () => {
     }));
   });
 
+  it('topic() posts JSON to /api/topic', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ text: '...' }));
+    vi.stubGlobal('fetch', fetchMock as any);
+    const api = createApiClient('');
+    await api.topic('nature');
+    expect(fetchMock).toHaveBeenCalledWith('/api/topic', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ keyword: 'nature' })
+    }));
+  });
+
+  it('dailyExpression() posts JSON to /api/daily-expression', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({}));
+    vi.stubGlobal('fetch', fetchMock as any);
+    const api = createApiClient('');
+    await api.dailyExpression();
+    expect(fetchMock).toHaveBeenCalledWith('/api/daily-expression', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({})
+    }));
+  });
+
+  it('dialogue() posts JSON to /api/dialogue', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({}));
+    vi.stubGlobal('fetch', fetchMock as any);
+    const api = createApiClient('');
+    await api.dialogue('hello');
+    expect(fetchMock).toHaveBeenCalledWith('/api/dialogue', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ text: 'hello' })
+    }));
+  });
+
   it('retries on 429 with exponential backoff (1s, 2s) then succeeds', async () => {
     vi.useFakeTimers();
 
