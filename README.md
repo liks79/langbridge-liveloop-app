@@ -34,6 +34,7 @@ graph LR
 ```
 ---
 > ✨ **NOTE**: 이 프로젝트는 AI의 도움을 받아 완성되었습니다.
+>
 > DEMO SITE: https://langbridge.liveloop.app/ (AI API 스로틀링 발생으로 사용이 원할하지 않을 수 있습니다.)
 
 ![Demo Screenshot](./src/assets/screenshot.png)
