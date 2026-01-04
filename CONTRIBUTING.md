@@ -25,5 +25,5 @@ If you find a bug or have a suggestion, please open an issue on GitHub with as m
 
 ---
 
-By contributing to this project, you agree that your contributions will be licensed under the [MIT License](./LICENSE).
+By contributing to this project, you agree that your contributions will be licensed under the [Apache License 2.0](./LICENSE).
 

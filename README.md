@@ -30,7 +30,7 @@
 ├── public/             # 정적 자산 (Favicon, 등)
 ├── wrangler.toml       # Cloudflare 통합 배포 설정
 ├── README.md           # 프로젝트 가이드 (통합본)
-└── LICENSE             # MIT License
+└── LICENSE             # Apache License 2.0
 ```
 
 ## 🛠️ 시작하기 (Getting Started)
@@ -86,7 +86,7 @@ npx wrangler versions upload
 
 ## 📄 라이선스 (License)
 
-이 프로젝트는 [MIT License](./LICENSE)를 따릅니다.
+이 프로젝트는 [Apache License 2.0](./LICENSE)를 따릅니다.
 
 ---
 
