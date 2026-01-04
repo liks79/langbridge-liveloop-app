@@ -1,5 +1,7 @@
 # 💬 LangBridge | LiveLoop.App 🌱
 
+**LangBridge**는 AI(Gemini 2.0)를 활용하여 영어 학습을 더 스마트하고 즐겁게 만들어주는 모던 웹 애플리케이션입니다. 분석, 퀴즈, 다이얼로그 생성 등 다양한 학습 기능을 통해 네이티브 수준의 영어를 경험하세요.
+
 ```mermaid
 graph LR
     subgraph Client ["**1. Client Side (Browser)**"]
@@ -30,10 +32,11 @@ graph LR
     FE --->|"API Call (/api/*)"| CORS
     API --->|"Secure Proxy (Secret Key)"| G
 ```
+---
+> ✨ **NOTE**: This project was crafted with the assistance of AI.
+> (이 프로젝트는 AI의 도움을 받아 완성되었습니다.)
 
-**LangBridge**는 AI(Gemini 2.0)를 활용하여 영어 학습을 더 스마트하고 즐겁게 만들어주는 모던 웹 애플리케이션입니다. 분석, 퀴즈, 다이얼로그 생성 등 다양한 학습 기능을 통해 네이티브 수준의 영어를 경험하세요.
-
-![LangBridge Demo](https://via.placeholder.com/800x450?text=LangBridge+Demo+Image)
+![Demo Screenshot](./src/assets/screenshot.png)
 
 ## ✨ 주요 기능 (Key Features)
 
