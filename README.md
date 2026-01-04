@@ -25,7 +25,7 @@ graph LR
 
     subgraph AI_Engine ["**3. AI Engine (Google Gemini)**"]
         direction TB
-        G["**Gemini 2.0 API**<br/>Analysis, Quiz, Dialogue, TTS"]
+        G["**Gemini API**<br/>Analysis, Quiz, Dialogue, TTS"]
     end
 
     FE --- Assets
@@ -33,8 +33,7 @@ graph LR
     API --->|"Secure Proxy (Secret Key)"| G
 ```
 ---
-> ✨ **NOTE**: This project was crafted with the assistance of AI.
-> (이 프로젝트는 AI의 도움을 받아 완성되었습니다.)
+> ✨ **NOTE**: 이 프로젝트는 AI의 도움을 받아 완성되었습니다.
 
 ![Demo Screenshot](./src/assets/screenshot.png)
 
