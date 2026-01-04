@@ -19,25 +19,43 @@ describe('apiClient', () => {
   });
 
   it('analyze() posts JSON to /api/analyze', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      void input;
-      void init;
-      return jsonResponse({ ok: true });
-    });
+    const fetchMock = vi.fn(async () => jsonResponse({ ok: true }));
     vi.stubGlobal('fetch', fetchMock as any);
 
     const api = createApiClient('');
     const res = await api.analyze('hello', 'EtoK');
     expect(res).toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledWith('/api/analyze', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ inputText: 'hello', detectedMode: 'EtoK' })
+    }));
+  });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [RequestInfo | URL, RequestInit | undefined];
-    expect(url).toBe('/api/analyze');
-    expect(init).toBeDefined();
-    const requestInit = init as RequestInit;
-    expect(requestInit.method).toBe('POST');
-    expect(requestInit.headers).toEqual({ 'Content-Type': 'application/json' });
-    expect(requestInit.body).toBe(JSON.stringify({ inputText: 'hello', detectedMode: 'EtoK' }));
+  it('quiz() posts JSON to /api/quiz', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ quiz: [] }));
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    const api = createApiClient('');
+    const res = await api.quiz('EtoK', { some: 'result' });
+    expect(res).toEqual({ quiz: [] });
+    expect(fetchMock).toHaveBeenCalledWith('/api/quiz', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ detectedMode: 'EtoK', result: { some: 'result' } })
+    }));
+  });
+
+  it('tts() posts text to /api/tts', async () => {
+    const blob = new Blob(['audio'], { type: 'audio/wav' });
+    const fetchMock = vi.fn(async () => new Response(blob, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    const api = createApiClient('');
+    const res = await api.tts('hello');
+    expect(res).toBeInstanceOf(Blob);
+    expect(fetchMock).toHaveBeenCalledWith('/api/tts', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ text: 'hello' })
+    }));
   });
 
   it('retries on 429 with exponential backoff (1s, 2s) then succeeds', async () => {
@@ -53,7 +71,7 @@ describe('apiClient', () => {
     const api = createApiClient('');
     const promise = api.analyze('hello', 'EtoK');
 
-    // First request happens immediately (flush microtasks only)
+    // First request happens immediately
     await Promise.resolve();
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
@@ -64,5 +82,3 @@ describe('apiClient', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
-
-

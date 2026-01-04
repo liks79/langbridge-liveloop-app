@@ -1113,6 +1113,7 @@ const App = () => {
           
           <div className="relative">
             <textarea
+              data-testid="main-input"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               placeholder="영어 문장을 입력하면 해석해주고, 한국어 문장을 입력하면 영어로 바꿔줍니다."
