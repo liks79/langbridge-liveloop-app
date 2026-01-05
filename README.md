@@ -121,7 +121,7 @@ npx wrangler versions upload
 ### 필수 환경 변수 설정 (Cloudflare Dashboard)
 배포 후 Cloudflare Dashboard의 **Settings > Variables**에서 다음 항목을 반드시 설정해야 합니다:
 - `GEMINI_API_KEY`: Google AI Studio에서 발급받은 API 키
-- `ALLOWED_ORIGINS`: 허용할 도메인 (예: `https://langbridge.exampl.com`)
+- `ALLOWED_ORIGINS`: 허용할 도메인 (예: `https://langbridge.example.com`)
 
 ## 🛡️ 보안 및 아키텍처 (Security & Architecture)
 
