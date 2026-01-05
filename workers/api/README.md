@@ -29,15 +29,15 @@ Gemini API Key는 절대 코드에 포함하지 마세요. Cloudflare Dashboard 
 ### 2. ALLOWED_ORIGINS (CORS 제한)
 무분별한 API 호출을 방지하기 위해 허용된 도메인에서만 호출 가능하도록 설정할 수 있습니다.
 - **운영 환경**: Cloudflare Dashboard의 **Settings > Variables**에서 `ALLOWED_ORIGINS` 변수를 설정하세요. (예: `https://langbridge.example.com`)
-- **로컬 개발**: `workers/api/.dev.vars` 파일에 설정하여 테스트할 수 있습니다. 설정이 비어있으면 모든 오리진을 허용합니다.
+- **로컬 개발**: 루트 디렉토리의 `.dev.vars` 파일에 설정하여 테스트할 수 있습니다. 설정이 비어있으면 모든 오리진을 허용합니다.
 
 ## 💻 로컬 개발 (Local Development)
 
-Wrangler 설정 파일이 루트에 있으므로, 반드시 **루트 디렉토리**에서 다음 명령어를 실행하세요:
+Wrangler 설정 파일과 환경 변수 파일(`.dev.vars`)이 루트에 있으므로, 반드시 **루트 디렉토리**에서 다음 명령어를 실행하세요:
 
 ```bash
 # 프로젝트 루트에서 실행
 npx wrangler dev
 ```
 
-Worker는 기본적으로 프론트엔드(`localhost:5173`)의 요청을 수락하며, `.dev.vars` 파일에 있는 환경 변수를 우선적으로 참고합니다.
+Worker는 기본적으로 프론트엔드(`localhost:5173`)의 요청을 수락하며, 루트의 `.dev.vars` 파일에 있는 환경 변수를 우선적으로 참고합니다.

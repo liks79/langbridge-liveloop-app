@@ -84,7 +84,7 @@ cd langbridge-liveloop-app
 npm install
 
 # 환경 변수 설정
-cp workers/api/.dev.vars.example workers/api/.dev.vars
+cp .dev.vars.example .dev.vars
 # .dev.vars 파일을 열고 GEMINI_API_KEY를 입력하세요.
 ```
 
