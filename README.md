@@ -135,4 +135,4 @@ npx wrangler versions upload
 
 ---
 
-Built with ❤️ by [LiveLoop.App](https://liveloop.app)
+Built with ❤️ by [LiveLoop.App](https://me.liveloop.app)
