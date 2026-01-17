@@ -40,6 +40,7 @@ graph LR
 ![Demo Screenshot](./src/assets/screenshot.png)
 
 ## ✨ 주요 기능 (Key Features)
+로컬스토리지(Local Storage)를 저장소로 사용하고 있기 때문에 사용하면서 발생한 정보들은 클라이언트(브라우저)에서 관리하는 하는 영역에 저장됩니다. 
 
 - **🔍 영어 분석 (AI Analysis)**: 입력한 문장의 뉘앙스, 문법, 핵심 단어를 AI가 정밀 분석합니다.
 - **🎧 쉐도잉 플레이어 (Shadowing Player)**: Gemini TTS를 활용한 고품질 발음 듣기 및 속도 조절 기능.
