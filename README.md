@@ -110,7 +110,7 @@ npx wrangler dev
 본 프로젝트는 **Cloudflare Workers with Assets**를 통해 프론트엔드와 백엔드가 하나의 프로젝트로 통합 배포됩니다. 다음의 문서를 참고 하실 수 있습니다.
 * [Cloudflare Pages 문서](https://developers.cloudflare.com/pages/)
 * [Cloudflare Workers 문서](https://developers.cloudflare.com/workers/)
-* [Cloudflare Dashboard Variables(환경 변수) 문서](https://developers.cloudflare.com/workers/configuration/environment-variables/)
+* [Cloudflare Dashboard Variables(환경 변수 적용) 문서](https://developers.cloudflare.com/workers/configuration/environment-variables/)
 
 ### 통합 배포 커맨드
 ```bash
