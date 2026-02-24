@@ -346,7 +346,7 @@ async function handleAnalyze(req: Request, env: Env) {
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
-    return json({ error: 'Gemini error', status: resp.status, detail: text }, { status: resp.status });
+    return json({ error: 'Gemini error', status: resp.status, detail: text, model }, { status: resp.status });
   }
 
   const data: any = await resp.json();
@@ -383,7 +383,7 @@ async function handleTopic(req: Request, env: Env) {
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
-    return json({ error: 'Gemini error', status: resp.status, detail: text }, { status: resp.status });
+    return json({ error: 'Gemini error', status: resp.status, detail: text, model }, { status: resp.status });
   }
 
   const data: any = await resp.json();
@@ -432,7 +432,7 @@ async function handleDailyExpression(req: Request, env: Env) {
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
-    return json({ error: 'Gemini error', status: resp.status, detail: text }, { status: resp.status });
+    return json({ error: 'Gemini error', status: resp.status, detail: text, model }, { status: resp.status });
   }
 
   const data: any = await resp.json();
@@ -469,7 +469,7 @@ async function handleDialogue(req: Request, env: Env) {
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
-    return json({ error: 'Gemini error', status: resp.status, detail: text }, { status: resp.status });
+    return json({ error: 'Gemini error', status: resp.status, detail: text, model }, { status: resp.status });
   }
 
   const data: any = await resp.json();
@@ -502,7 +502,7 @@ async function handleQuiz(req: Request, env: Env) {
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
-    return json({ error: 'Gemini error', status: resp.status, detail: text }, { status: resp.status });
+    return json({ error: 'Gemini error', status: resp.status, detail: text, model }, { status: resp.status });
   }
 
   const data: any = await resp.json();
@@ -540,7 +540,7 @@ async function handleTts(req: Request, env: Env) {
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
-    return json({ error: 'Gemini error', status: resp.status, detail: text }, { status: resp.status });
+    return json({ error: 'Gemini error', status: resp.status, detail: text, model }, { status: resp.status });
   }
 
   const data: any = await resp.json();
@@ -566,13 +566,14 @@ async function handleTts(req: Request, env: Env) {
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
+    const pathname = url.pathname.replace(/\/+$/, '');
 
     if (req.method === 'OPTIONS') {
       return withCors(req, new Response(null, { status: 204 }), env);
     }
 
-    if (!url.pathname.startsWith('/api/')) {
-      return withCors(req, json({ error: 'Not found' }, { status: 404 }), env);
+    if (!pathname.startsWith('/api/')) {
+      return withCors(req, json({ error: 'Not found', path: pathname, method: req.method }, { status: 404 }), env);
     }
 
     if (!env.GEMINI_API_KEY) {
@@ -581,13 +582,13 @@ export default {
 
     try {
       let res: Response;
-      if (req.method === 'POST' && url.pathname === '/api/analyze') res = await handleAnalyze(req, env);
-      else if (req.method === 'POST' && url.pathname === '/api/quiz') res = await handleQuiz(req, env);
-      else if (req.method === 'POST' && url.pathname === '/api/tts') res = await handleTts(req, env);
-      else if (req.method === 'POST' && url.pathname === '/api/topic') res = await handleTopic(req, env);
-      else if (req.method === 'POST' && url.pathname === '/api/daily-expression') res = await handleDailyExpression(req, env);
-      else if (req.method === 'POST' && url.pathname === '/api/dialogue') res = await handleDialogue(req, env);
-      else res = json({ error: 'Not found' }, { status: 404 });
+      if (req.method === 'POST' && pathname === '/api/analyze') res = await handleAnalyze(req, env);
+      else if (req.method === 'POST' && pathname === '/api/quiz') res = await handleQuiz(req, env);
+      else if (req.method === 'POST' && pathname === '/api/tts') res = await handleTts(req, env);
+      else if (req.method === 'POST' && pathname === '/api/topic') res = await handleTopic(req, env);
+      else if (req.method === 'POST' && pathname === '/api/daily-expression') res = await handleDailyExpression(req, env);
+      else if (req.method === 'POST' && pathname === '/api/dialogue') res = await handleDialogue(req, env);
+      else res = json({ error: 'Not found', path: pathname, method: req.method }, { status: 404 });
 
       return withCors(req, res, env);
     } catch (e: any) {

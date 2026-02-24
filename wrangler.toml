@@ -8,10 +8,9 @@ compatibility_date = "2025-12-25"
 directory = "./dist"
 
 [vars]
-# Default models
-GEMINI_TEXT_MODEL = "gemini-2.5-flash-preview-09-2025"
-# GEMINI_TEXT_MODEL = "gemini-1.5-flash-latest"
-GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts"
+# Default models (stable; preview models may return 404 when deprecated)
+GEMINI_TEXT_MODEL = "gemini-1.5-flash-latest"
+GEMINI_TTS_MODEL = "gemini-2.0-flash-exp"
 GEMINI_TTS_VOICE = "Aoede"
 GEMINI_TTS_VOICE_WOMAN = "Aoede"
 GEMINI_TTS_VOICE_MAN = "Charon"
