@@ -62,8 +62,8 @@ Copy `.dev.vars.example` to `.dev.vars` at the repo root for local development.
 |---|---|---|
 | `GEMINI_API_KEY` | Yes | Google AI Studio API key |
 | `ALLOWED_ORIGINS` | No | Comma-separated allowed CORS origins |
-| `GEMINI_TEXT_MODEL` | No | Defaults to `gemini-1.5-flash-latest` |
-| `GEMINI_TTS_MODEL` | No | Defaults to `gemini-2.0-flash-exp` |
+| `GEMINI_TEXT_MODEL` | No | Defaults to `gemini-2.5-flash` |
+| `GEMINI_TTS_MODEL` | No | Defaults to `gemini-2.5-flash-preview-tts` |
 
 In production, `GEMINI_API_KEY` and `ALLOWED_ORIGINS` are set in the Cloudflare Dashboard (not in `wrangler.toml`).
 
