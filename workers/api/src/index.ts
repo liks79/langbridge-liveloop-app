@@ -335,7 +335,7 @@ async function handleAnalyze(req: Request, env: Env) {
   if (!body?.inputText?.trim()) return json({ error: 'inputText is required' }, { status: 400 });
   const detectedMode = body.detectedMode === 'KtoE' ? 'KtoE' : 'EtoK';
 
-  const model = env.GEMINI_TEXT_MODEL || 'gemini-1.5-flash-latest';
+  const model = env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
   const systemPrompt = buildAnalyzePrompt(detectedMode);
 
   const resp = await geminiGenerateContent(env, model, {
@@ -346,7 +346,7 @@ async function handleAnalyze(req: Request, env: Env) {
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
-    return json({ error: 'Gemini error', status: resp.status, detail: text }, { status: resp.status });
+    return json({ error: 'Gemini error', status: resp.status, detail: text, model }, { status: resp.status });
   }
 
   const data: any = await resp.json();
@@ -372,7 +372,7 @@ async function handleTopic(req: Request, env: Env) {
   const season = seasonFromMonth(month1To12);
   const todayISO = now.toISOString().slice(0, 10);
 
-  const model = env.GEMINI_TEXT_MODEL || 'gemini-1.5-flash-latest';
+  const model = env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
   const systemPrompt = buildTopicPrompt({ keyword, todayISO, monthName, weekdayName, season });
 
   const resp = await geminiGenerateContent(env, model, {
@@ -383,7 +383,7 @@ async function handleTopic(req: Request, env: Env) {
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
-    return json({ error: 'Gemini error', status: resp.status, detail: text }, { status: resp.status });
+    return json({ error: 'Gemini error', status: resp.status, detail: text, model }, { status: resp.status });
   }
 
   const data: any = await resp.json();
@@ -421,7 +421,7 @@ async function handleDailyExpression(req: Request, env: Env) {
   ];
   const randomCategory = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
 
-  const model = env.GEMINI_TEXT_MODEL || 'gemini-1.5-flash-latest';
+  const model = env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
   const systemPrompt = buildDailyExpressionPrompt({ todayISO, weekdayName, category: randomCategory });
 
   const resp = await geminiGenerateContent(env, model, {
@@ -432,7 +432,7 @@ async function handleDailyExpression(req: Request, env: Env) {
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
-    return json({ error: 'Gemini error', status: resp.status, detail: text }, { status: resp.status });
+    return json({ error: 'Gemini error', status: resp.status, detail: text, model }, { status: resp.status });
   }
 
   const data: any = await resp.json();
@@ -458,7 +458,7 @@ async function handleDialogue(req: Request, env: Env) {
   const text = typeof body?.text === 'string' ? body.text : '';
   if (!text.trim()) return json({ error: 'text is required' }, { status: 400 });
 
-  const model = env.GEMINI_TEXT_MODEL || 'gemini-1.5-flash-latest';
+  const model = env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
   const systemPrompt = buildDialoguePrompt(text);
 
   const resp = await geminiGenerateContent(env, model, {
@@ -469,7 +469,7 @@ async function handleDialogue(req: Request, env: Env) {
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
-    return json({ error: 'Gemini error', status: resp.status, detail: text }, { status: resp.status });
+    return json({ error: 'Gemini error', status: resp.status, detail: text, model }, { status: resp.status });
   }
 
   const data: any = await resp.json();
@@ -491,7 +491,7 @@ async function handleQuiz(req: Request, env: Env) {
   if (!body?.result) return json({ error: 'result is required' }, { status: 400 });
   const detectedMode = body.detectedMode === 'KtoE' ? 'KtoE' : 'EtoK';
 
-  const model = env.GEMINI_TEXT_MODEL || 'gemini-1.5-flash-latest';
+  const model = env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
   const quizPrompt = buildQuizPrompt(detectedMode, body.result);
 
   const resp = await geminiGenerateContent(env, model, {
@@ -502,7 +502,7 @@ async function handleQuiz(req: Request, env: Env) {
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
-    return json({ error: 'Gemini error', status: resp.status, detail: text }, { status: resp.status });
+    return json({ error: 'Gemini error', status: resp.status, detail: text, model }, { status: resp.status });
   }
 
   const data: any = await resp.json();
@@ -521,7 +521,7 @@ async function handleTts(req: Request, env: Env) {
   const body = (await req.json()) as TtsRequest;
   if (!body?.text?.trim()) return json({ error: 'text is required' }, { status: 400 });
 
-  const model = env.GEMINI_TTS_MODEL || 'gemini-2.0-flash-exp';
+  const model = env.GEMINI_TTS_MODEL || 'gemini-2.5-flash-preview-tts';
   let voice = body.voice || env.GEMINI_TTS_VOICE || 'Aoede';
   if (voice === 'WOMAN') voice = env.GEMINI_TTS_VOICE_WOMAN || 'Aoede';
   if (voice === 'MAN') voice = env.GEMINI_TTS_VOICE_MAN || 'Charon';
@@ -540,7 +540,7 @@ async function handleTts(req: Request, env: Env) {
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => '');
-    return json({ error: 'Gemini error', status: resp.status, detail: text }, { status: resp.status });
+    return json({ error: 'Gemini error', status: resp.status, detail: text, model }, { status: resp.status });
   }
 
   const data: any = await resp.json();
@@ -566,13 +566,14 @@ async function handleTts(req: Request, env: Env) {
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
+    const pathname = url.pathname.replace(/\/+$/, '');
 
     if (req.method === 'OPTIONS') {
       return withCors(req, new Response(null, { status: 204 }), env);
     }
 
-    if (!url.pathname.startsWith('/api/')) {
-      return withCors(req, json({ error: 'Not found' }, { status: 404 }), env);
+    if (!pathname.startsWith('/api/')) {
+      return withCors(req, json({ error: 'Not found', path: pathname, method: req.method }, { status: 404 }), env);
     }
 
     if (!env.GEMINI_API_KEY) {
@@ -581,13 +582,13 @@ export default {
 
     try {
       let res: Response;
-      if (req.method === 'POST' && url.pathname === '/api/analyze') res = await handleAnalyze(req, env);
-      else if (req.method === 'POST' && url.pathname === '/api/quiz') res = await handleQuiz(req, env);
-      else if (req.method === 'POST' && url.pathname === '/api/tts') res = await handleTts(req, env);
-      else if (req.method === 'POST' && url.pathname === '/api/topic') res = await handleTopic(req, env);
-      else if (req.method === 'POST' && url.pathname === '/api/daily-expression') res = await handleDailyExpression(req, env);
-      else if (req.method === 'POST' && url.pathname === '/api/dialogue') res = await handleDialogue(req, env);
-      else res = json({ error: 'Not found' }, { status: 404 });
+      if (req.method === 'POST' && pathname === '/api/analyze') res = await handleAnalyze(req, env);
+      else if (req.method === 'POST' && pathname === '/api/quiz') res = await handleQuiz(req, env);
+      else if (req.method === 'POST' && pathname === '/api/tts') res = await handleTts(req, env);
+      else if (req.method === 'POST' && pathname === '/api/topic') res = await handleTopic(req, env);
+      else if (req.method === 'POST' && pathname === '/api/daily-expression') res = await handleDailyExpression(req, env);
+      else if (req.method === 'POST' && pathname === '/api/dialogue') res = await handleDialogue(req, env);
+      else res = json({ error: 'Not found', path: pathname, method: req.method }, { status: 404 });
 
       return withCors(req, res, env);
     } catch (e: any) {

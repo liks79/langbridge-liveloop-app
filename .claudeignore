@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+workers/*/node_modules/
+
+# Build output
+dist/
+dist-ssr/
+coverage/
+
+# Wrangler / Cloudflare Workers artifacts
+.wrangler/
+workers/**/.wrangler/
+
+# Logs
+*.log
+logs/
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Test cache
+.vitest/
