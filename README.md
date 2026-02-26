@@ -101,8 +101,8 @@ npm run test:run
 # 프론트엔드 실행 (http://localhost:5173)
 npm run dev
 
-# Worker 로컬 실행 (별도 터미널에서)
-npx wrangler dev
+# Worker 로컬 실행 (별도 터미널에서) (http://localhost:8787)
+npx wrangler dev 
 ```
 
 ## 🌐 배포 (Deployment)
